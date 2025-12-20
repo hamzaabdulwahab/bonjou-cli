@@ -1,15 +1,15 @@
 class Bonjou < Formula
   desc "Terminal-based LAN chat and transfer application"
-  homepage "https://github.com/hamzawahab/bonjou-terminal"
+  homepage "https://github.com/hamzaabdulwahab/bonjou-terminal"
   version "1.0.0"
 
   on_macos do
-    url "https://example.com/downloads/bonjou-1.0.0-darwin.tar.gz"
-    sha256 "REPLACE_WITH_ACTUAL_SHA256"
+    url "https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou-macos.tar.gz"
+    sha256 "9b200d62c66f1c4d0e526ed233276542ab9aaad166dc4204c0b3ada1a7c20b95"
   end
 
   def install
-    bin.install "bonjou"
+    bin.install "bonjou-macos" => "bonjou"
   end
 
   def caveats
