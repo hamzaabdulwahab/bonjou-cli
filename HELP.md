@@ -56,7 +56,11 @@ Files are received in:
 
 ## Finding Users in Other Labs
 
-Bonjou automatically scans all subnets when it starts. It detects your network (10.x.x.x or 192.168.x.x) and scans accordingly. Users in other labs should appear in `@users` within 2-3 minutes.
+Bonjou announces itself automatically. On the same subnet, users appear quickly via UDP broadcast.
+
+Across different subnets (for example `10.23.x.x` and `10.24.x.x`), broadcast does not cross routers, so Bonjou uses scanning and direct (unicast) announcements.
+
+On startup Bonjou does a quick scan of nearby subnets. Users in other labs should appear in `@users` within about 1-2 minutes.
 
 **If someone is not showing up:**
 
@@ -72,7 +76,7 @@ This scans ALL subnets (1-255) in your network and takes about 2 minutes.
 @connect 10.23.81.71
 ```
 
-This is faster - sends your info directly to them.
+This is faster - sends your info directly to them. Bonjou will also keep sending periodic direct announcements so you both stay visible across subnets.
 
 ## Settings
 

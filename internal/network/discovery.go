@@ -35,6 +35,10 @@ type DiscoveryService struct {
 	logger    *logger.Logger
 	peers     map[string]*Peer
 	mu        sync.RWMutex
+	targetsMu sync.RWMutex
+	// directTargets are IPs we periodically send direct (unicast) announcements to.
+	// This is required for cross-subnet presence because broadcast does not cross routers.
+	directTargets map[string]time.Time
 	localMu   sync.RWMutex
 	stop      chan struct{}
 	stopOnce  sync.Once
@@ -59,6 +63,7 @@ func NewDiscoveryService(cfg *config.Config, logger *logger.Logger) *DiscoverySe
 		cfg:    cfg,
 		logger: logger,
 		peers:  make(map[string]*Peer),
+		directTargets: make(map[string]time.Time),
 		stop:   make(chan struct{}),
 	}
 }
@@ -119,6 +124,16 @@ func (d *DiscoveryService) UpdateLocalEndpoint(ip string, port int) {
 	d.peers = make(map[string]*Peer)
 	d.mu.Unlock()
 
+	// Preserve manually added targets so @connect keeps working after endpoint changes,
+	// but drop any auto-learned targets (they may belong to the old network).
+	d.targetsMu.Lock()
+	for key, addedAt := range d.directTargets {
+		// Keep targets that are explicitly provided by the user (we can't distinguish
+		// perfectly, but we do keep everything and let stale cleanup handle it).
+		d.directTargets[key] = addedAt
+	}
+	d.targetsMu.Unlock()
+
 	go d.ForceAnnounce()
 }
 
@@ -148,7 +163,9 @@ func (d *DiscoveryService) ListPeers() []Peer {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var out []Peer
-	expiry := time.Now().Add(-15 * time.Second)
+	// Keep peers around long enough for cross-subnet scans/handshakes to be visible.
+	// Same-subnet peers refresh via broadcast every ~5s.
+	expiry := time.Now().Add(-2 * time.Minute)
 	for key, peer := range d.peers {
 		if peer.LastSeen.Before(expiry) {
 			delete(d.peers, key)
@@ -211,7 +228,31 @@ func (d *DiscoveryService) AddManualPeer(ip string, port int) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	// Persist the target so we keep sending unicast announcements periodically.
+	// This prevents peers on other subnets from disappearing (broadcast won't reach them).
+	d.trackDirectTarget(ip)
+
 	return nil
+}
+
+func (d *DiscoveryService) trackDirectTarget(ip string) {
+	parsed := net.ParseIP(ip).To4()
+	if parsed == nil {
+		return
+	}
+	key := parsed.String()
+	d.targetsMu.Lock()
+	d.directTargets[key] = time.Now()
+	d.targetsMu.Unlock()
+}
+
+func same24(a, b string) bool {
+	a4 := net.ParseIP(a).To4()
+	b4 := net.ParseIP(b).To4()
+	if a4 == nil || b4 == nil {
+		return false
+	}
+	return a4[0] == b4[0] && a4[1] == b4[1] && a4[2] == b4[2]
 }
 
 // ScanSubnets scans multiple subnets to find Bonjou peers.
@@ -378,28 +419,40 @@ func (d *DiscoveryService) listenLoop() {
 			d.logger.Error("invalid announcement from %s: %v", remote.IP.String(), err)
 			continue
 		}
+
+		senderIP := remote.IP.String()
+		if senderIP == "" {
+			senderIP = ann.IP
+		}
 		d.localMu.RLock()
 		localIP := d.localIP
 		localPort := d.localPort
 		d.localMu.RUnlock()
-		if ann.IP == localIP && ann.Port == localPort {
+		if senderIP == localIP && ann.Port == localPort {
 			continue
 		}
 
 		// Check if this is a new peer (cross-subnet connection)
 		d.mu.RLock()
-		_, existed := d.peers[ann.IP]
+		_, existed := d.peers[senderIP]
 		d.mu.RUnlock()
 
-		peer := &Peer{Username: ann.Username, IP: ann.IP, Port: ann.Port, LastSeen: time.Now(), Secret: ann.Secret}
+		// IMPORTANT: Trust the packet source IP for routing/reachability.
+		// Payload IP can be wrong if the sender picked the wrong interface (VPN/Docker/etc.).
+		peer := &Peer{Username: ann.Username, IP: senderIP, Port: ann.Port, LastSeen: time.Now(), Secret: ann.Secret}
 		d.mu.Lock()
 		d.peers[peer.IP] = peer
 		d.mu.Unlock()
 
+		// If the peer is not in our /24, keep a direct target so they don't expire.
+		if !same24(senderIP, localIP) {
+			d.trackDirectTarget(senderIP)
+		}
+
 		// If this is a new peer, send our announcement back directly
 		// This enables two-way discovery across subnets
 		if !existed {
-			go d.sendDirectAnnouncement(ann.IP)
+			go d.sendDirectAnnouncement(senderIP)
 		}
 	}
 }
@@ -445,10 +498,58 @@ func (d *DiscoveryService) announceLoop() {
 		select {
 		case <-ticker.C:
 			d.sendCurrentAnnouncement(conn)
+			d.sendDirectKeepalives(conn)
 		case <-d.stop:
 			return
 		}
 	}
+}
+
+func (d *DiscoveryService) sendDirectKeepalives(conn *net.UDPConn) {
+	if d.isStopping() {
+		return
+	}
+	// Refresh payload once per tick.
+	payload, ok := d.prepareAnnouncement()
+	if !ok {
+		return
+	}
+
+	// Snapshot targets.
+	cutoff := time.Now().Add(-30 * time.Minute)
+	d.targetsMu.RLock()
+	targets := make([]string, 0, len(d.directTargets))
+	for ip, last := range d.directTargets {
+		if last.Before(cutoff) {
+			continue
+		}
+		targets = append(targets, ip)
+	}
+	d.targetsMu.RUnlock()
+
+	if len(targets) == 0 {
+		return
+	}
+
+	for _, ip := range targets {
+		if d.isStopping() {
+			return
+		}
+		addr := &net.UDPAddr{IP: net.ParseIP(ip), Port: d.cfg.DiscoveryPort}
+		if _, err := conn.WriteToUDP(payload, addr); err != nil {
+			// Don't spam logs; cross-subnet networks may block ICMP/UDP.
+			continue
+		}
+	}
+
+	// Cleanup stale targets.
+	d.targetsMu.Lock()
+	for ip, last := range d.directTargets {
+		if last.Before(cutoff) {
+			delete(d.directTargets, ip)
+		}
+	}
+	d.targetsMu.Unlock()
 }
 
 func (d *DiscoveryService) sendCurrentAnnouncement(conn *net.UDPConn) {
