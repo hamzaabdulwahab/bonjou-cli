@@ -25,13 +25,12 @@ brew update && brew upgrade bonjou
 
 1. Download from releases:
 ```bash
-curl -L -o bonjou-macos.tar.gz https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-macos.tar.gz
+curl -L -o bonjou https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-macos
 ```
 
-2. Extract and install:
+2. Install:
 ```bash
-tar -xzf bonjou-macos.tar.gz
-sudo mv bonjou-macos /usr/local/bin/bonjou
+sudo mv bonjou /usr/local/bin/bonjou
 sudo chmod +x /usr/local/bin/bonjou
 ```
 
@@ -55,9 +54,16 @@ sudo mv bonjou /usr/local/bin/
 
 ### Option 1: Debian/Ubuntu package
 
+**Intel/AMD (most PCs):**
 ```bash
 wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
 sudo dpkg -i bonjou_1.0.0_amd64.deb
+```
+
+**ARM64 (Mac with Docker/Parallels, Raspberry Pi):**
+```bash
+wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou_1.0.0_arm64.deb
+sudo dpkg -i bonjou_1.0.0_arm64.deb
 ```
 
 If you get dependency errors:
@@ -72,10 +78,17 @@ bonjou
 
 ### Option 2: Download manually
 
+**Intel/AMD:**
 ```bash
-curl -L -o bonjou-linux.tar.gz https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-linux.tar.gz
-tar -xzf bonjou-linux.tar.gz
-sudo mv bonjou-linux /usr/local/bin/bonjou
+curl -L -o bonjou https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-linux-amd64
+sudo mv bonjou /usr/local/bin/bonjou
+sudo chmod +x /usr/local/bin/bonjou
+```
+
+**ARM64:**
+```bash
+curl -L -o bonjou https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-linux-arm64
+sudo mv bonjou /usr/local/bin/bonjou
 sudo chmod +x /usr/local/bin/bonjou
 ```
 
