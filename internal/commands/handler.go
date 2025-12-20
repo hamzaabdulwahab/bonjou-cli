@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
 
-	"github.com/hamzawahab/bonjou-terminal/internal/history"
-	"github.com/hamzawahab/bonjou-terminal/internal/network"
-	"github.com/hamzawahab/bonjou-terminal/internal/session"
+	"github.com/hamzawahab/bonjou-cli/internal/history"
+	"github.com/hamzawahab/bonjou-cli/internal/network"
+	"github.com/hamzawahab/bonjou-cli/internal/session"
 )
 
 var ErrUnknownCommand = errors.New("unknown command")
@@ -75,8 +74,6 @@ func (h *Handler) Handle(input string) (Result, error) {
 		return h.cmdSetName(args)
 	case "status":
 		return h.cmdStatus()
-	case "update":
-		return h.cmdUpdate()
 	case "clear":
 		return h.cmdClear(args)
 	case "exit":
@@ -388,27 +385,6 @@ func (h *Handler) cmdClear(arg string) (Result, error) {
 	return Result{Output: "Usage: @clear [history]"}, nil
 }
 
-func (h *Handler) cmdUpdate() (Result, error) {
-	options := []string{}
-	if path, err := exec.LookPath("bonjou-update"); err == nil {
-		options = append(options, path)
-	}
-	options = append(options, filepath.Join(h.session.Config.ConfigDir(), "update.sh"))
-	for _, candidate := range options {
-		if candidate == "" {
-			continue
-		}
-		if _, err := os.Stat(candidate); err != nil {
-			continue
-		}
-		if err := runUpdateCandidate(candidate); err != nil {
-			return Result{}, err
-		}
-		return Result{Output: fmt.Sprintf("Update script %s executed.", candidate)}, nil
-	}
-	return Result{Output: "No update source found. Install updates via packaging instructions."}, nil
-}
-
 func (h *Handler) resolvePeer(target string) (*network.Peer, error) {
 	target = strings.TrimSpace(target)
 	if target == "" {
@@ -479,13 +455,6 @@ func safePeerLabel(name string) string {
 		return "(unknown)"
 	}
 	return trimmed
-}
-
-func runUpdateCandidate(path string) error {
-	cmd := exec.Command(path)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func splitMultiArgs(input string) (string, string, bool) {
@@ -609,8 +578,6 @@ func helpText() string {
 	b.WriteString("    Change where incoming files and folders are stored." + "\n")
 	b.WriteString("  " + accent + "@clear [history]" + reset + "\n")
 	b.WriteString("    Clear the screen, or include history to wipe saved logs." + "\n")
-	b.WriteString("  " + accent + "@update" + reset + "\n")
-	b.WriteString("    Execute a local updater script if one exists." + "\n")
 	b.WriteString("  " + accent + "@help" + reset + "\n")
 	b.WriteString("    View this guide again." + "\n")
 	b.WriteString("  " + accent + "@exit" + reset + "\n")

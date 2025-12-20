@@ -29,11 +29,11 @@ scoop install bonjou
 
 **Linux (.deb):**
 ```bash
-wget https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
+wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
 sudo dpkg -i bonjou_1.0.0_amd64.deb
 ```
 
-Or download from [Releases](https://github.com/hamzaabdulwahab/bonjou-terminal/releases).
+Or download from [Releases](https://github.com/hamzaabdulwahab/bonjou-cli/releases).
 
 ### Run
 
@@ -75,8 +75,8 @@ Bonjou automatically scans nearby subnets when it starts. Users in different lab
 Need Go 1.21 or newer.
 
 ```bash
-git clone https://github.com/hamzaabdulwahab/bonjou-terminal.git
-cd bonjou-terminal
+git clone https://github.com/hamzaabdulwahab/bonjou-cli.git
+cd bonjou-cli
 go run ./cmd/bonjou
 ```
 

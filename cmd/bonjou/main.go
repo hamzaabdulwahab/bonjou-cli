@@ -9,15 +9,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hamzawahab/bonjou-terminal/internal/commands"
-	"github.com/hamzawahab/bonjou-terminal/internal/config"
-	"github.com/hamzawahab/bonjou-terminal/internal/events"
-	"github.com/hamzawahab/bonjou-terminal/internal/history"
-	"github.com/hamzawahab/bonjou-terminal/internal/logger"
-	"github.com/hamzawahab/bonjou-terminal/internal/network"
-	"github.com/hamzawahab/bonjou-terminal/internal/session"
-	"github.com/hamzawahab/bonjou-terminal/internal/ui"
-	"github.com/hamzawahab/bonjou-terminal/internal/version"
+	"github.com/hamzawahab/bonjou-cli/internal/commands"
+	"github.com/hamzawahab/bonjou-cli/internal/config"
+	"github.com/hamzawahab/bonjou-cli/internal/events"
+	"github.com/hamzawahab/bonjou-cli/internal/history"
+	"github.com/hamzawahab/bonjou-cli/internal/logger"
+	"github.com/hamzawahab/bonjou-cli/internal/network"
+	"github.com/hamzawahab/bonjou-cli/internal/session"
+	"github.com/hamzawahab/bonjou-cli/internal/ui"
+	"github.com/hamzawahab/bonjou-cli/internal/version"
 )
 
 func main() {

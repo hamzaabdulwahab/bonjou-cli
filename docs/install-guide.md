@@ -25,7 +25,7 @@ brew update && brew upgrade bonjou
 
 1. Download from releases:
 ```bash
-curl -L -o bonjou-macos.tar.gz https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou-macos.tar.gz
+curl -L -o bonjou-macos.tar.gz https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-macos.tar.gz
 ```
 
 2. Extract and install:
@@ -43,8 +43,8 @@ bonjou
 ### Option 3: Build from source
 
 ```bash
-git clone https://github.com/hamzaabdulwahab/bonjou-terminal.git
-cd bonjou-terminal
+git clone https://github.com/hamzaabdulwahab/bonjou-cli.git
+cd bonjou-cli
 go build -o bonjou ./cmd/bonjou
 sudo mv bonjou /usr/local/bin/
 ```
@@ -56,7 +56,7 @@ sudo mv bonjou /usr/local/bin/
 ### Option 1: Debian/Ubuntu package
 
 ```bash
-wget https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
+wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
 sudo dpkg -i bonjou_1.0.0_amd64.deb
 ```
 
@@ -73,7 +73,7 @@ bonjou
 ### Option 2: Download manually
 
 ```bash
-curl -L -o bonjou-linux.tar.gz https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou-linux.tar.gz
+curl -L -o bonjou-linux.tar.gz https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-linux.tar.gz
 tar -xzf bonjou-linux.tar.gz
 sudo mv bonjou-linux /usr/local/bin/bonjou
 sudo chmod +x /usr/local/bin/bonjou
@@ -82,8 +82,8 @@ sudo chmod +x /usr/local/bin/bonjou
 ### Option 3: Build from source
 
 ```bash
-git clone https://github.com/hamzaabdulwahab/bonjou-terminal.git
-cd bonjou-terminal
+git clone https://github.com/hamzaabdulwahab/bonjou-cli.git
+cd bonjou-cli
 go build -o bonjou ./cmd/bonjou
 sudo mv bonjou /usr/local/bin/
 ```
@@ -120,7 +120,7 @@ scoop install bonjou
 
 1. Download from releases:
 ```powershell
-Invoke-WebRequest -Uri https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou-windows.zip -OutFile bonjou-windows.zip
+Invoke-WebRequest -Uri https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-windows.zip -OutFile bonjou-windows.zip
 ```
 
 2. Extract:
@@ -140,8 +140,8 @@ bonjou
 ### Option 3: Build from source
 
 ```powershell
-git clone https://github.com/hamzaabdulwahab/bonjou-terminal.git
-cd bonjou-terminal
+git clone https://github.com/hamzaabdulwahab/bonjou-cli.git
+cd bonjou-cli
 go build -o bonjou.exe .\cmd\bonjou
 ```
 

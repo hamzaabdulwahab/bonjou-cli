@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hamzawahab/bonjou-terminal/internal/config"
+	"github.com/hamzawahab/bonjou-cli/internal/config"
 )
 
 type Manager struct {

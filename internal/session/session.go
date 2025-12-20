@@ -3,11 +3,11 @@ package session
 import (
 	"sync"
 
-	"github.com/hamzawahab/bonjou-terminal/internal/config"
-	"github.com/hamzawahab/bonjou-terminal/internal/events"
-	"github.com/hamzawahab/bonjou-terminal/internal/history"
-	"github.com/hamzawahab/bonjou-terminal/internal/logger"
-	"github.com/hamzawahab/bonjou-terminal/internal/network"
+	"github.com/hamzawahab/bonjou-cli/internal/config"
+	"github.com/hamzawahab/bonjou-cli/internal/events"
+	"github.com/hamzawahab/bonjou-cli/internal/history"
+	"github.com/hamzawahab/bonjou-cli/internal/logger"
+	"github.com/hamzawahab/bonjou-cli/internal/network"
 )
 
 // Session wires together Bonjou runtime services.
