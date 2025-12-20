@@ -27,10 +27,15 @@ scoop bucket add bonjou https://github.com/hamzaabdulwahab/scoop-bonjou
 scoop install bonjou
 ```
 
-**Linux (.deb):**
+**Linux (Ubuntu/Debian):**
 ```bash
+# For Intel/AMD (most PCs, cloud VMs)
 wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
 sudo dpkg -i bonjou_1.0.0_amd64.deb
+
+# For ARM64 (Mac with Docker/Parallels, Raspberry Pi)
+wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou_1.0.0_arm64.deb
+sudo dpkg -i bonjou_1.0.0_arm64.deb
 ```
 
 Or download from [Releases](https://github.com/hamzaabdulwahab/bonjou-cli/releases).
