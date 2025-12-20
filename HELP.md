@@ -54,6 +54,26 @@ Files are received in:
 - `~/.bonjou/received/files/`
 - `~/.bonjou/received/folders/`
 
+## Finding Users in Other Labs
+
+Bonjou automatically scans nearby subnets (192.168.1-20.x) when it starts. Users in other labs should appear in `@users` within a few seconds.
+
+**If someone is not showing up:**
+
+```
+@scan
+```
+
+This scans ALL subnets (192.168.1-255.x) and takes about 2 minutes. Users will appear in `@users` as they are found.
+
+**If you know their IP:**
+
+```
+@connect 192.168.6.13
+```
+
+This is instant - just enter their IP directly.
+
 ## Settings
 
 **Change your username:**
@@ -68,7 +88,9 @@ Files are received in:
 
 ## Tips
 
-- Wait for people to show up in `@users` before sending to them
+- Same lab: users appear automatically in `@users`
+- Different lab: wait a few seconds, or use `@scan` to find everyone
+- Know their IP? Use `@connect <ip>` for instant connection
 - Use quotes for paths with spaces: `@file alex "~/My Documents/file.pdf"`
 - Use `~` for home directory
-- Run `bonjou --version` to check version without opening the app
+- Run `bonjou --version` to check version

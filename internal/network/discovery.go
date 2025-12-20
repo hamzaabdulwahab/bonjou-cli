@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -76,6 +77,10 @@ func (d *DiscoveryService) Start(username, ip string, port int) error {
 	go d.listenLoop()
 	go d.announceLoop()
 	d.started = true
+
+	// Auto-scan nearby subnets to find peers in other labs
+	d.StartupScan()
+
 	return nil
 }
 
@@ -174,6 +179,123 @@ func (d *DiscoveryService) Resolve(target string) (*Peer, error) {
 	return nil, errors.New("peer not found")
 }
 
+// AddManualPeer sends a direct announcement to a peer on a different subnet.
+// When they receive it, they will respond back, enabling two-way discovery.
+func (d *DiscoveryService) AddManualPeer(ip string, port int) error {
+	if ip == "" {
+		return errors.New("IP address required")
+	}
+	if port <= 0 {
+		port = d.cfg.ListenPort
+	}
+
+	// Send direct announcement to the target IP
+	payload, ok := d.prepareAnnouncement()
+	if !ok {
+		return errors.New("failed to prepare announcement")
+	}
+
+	conn, err := net.ListenUDP("udp4", nil)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	target := &net.UDPAddr{IP: net.ParseIP(ip), Port: d.cfg.DiscoveryPort}
+	if _, err := conn.WriteToUDP(payload, target); err != nil {
+		return err
+	}
+
+	// Don't add to peer list yet - wait for them to respond
+	// When they receive our announcement, they'll send theirs back
+	// and we'll add them in listenLoop()
+
+	return nil
+}
+
+// ScanSubnets scans multiple subnets to find Bonjou peers.
+// It sends announcements to all IPs in the given subnet range.
+// Peers running Bonjou will respond and appear in ListPeers().
+func (d *DiscoveryService) ScanSubnets(startSubnet, endSubnet int) int {
+	if d.isStopping() {
+		return 0
+	}
+
+	payload, ok := d.prepareAnnouncement()
+	if !ok {
+		return 0
+	}
+
+	conn, err := net.ListenUDP("udp4", nil)
+	if err != nil {
+		d.logger.Error("scan socket: %v", err)
+		return 0
+	}
+	defer conn.Close()
+
+	// Get our local subnet to skip it (already covered by broadcast)
+	d.localMu.RLock()
+	localIP := d.localIP
+	d.localMu.RUnlock()
+
+	localSubnet := 0
+	if parts := net.ParseIP(localIP).To4(); parts != nil {
+		localSubnet = int(parts[2])
+	}
+
+	sent := 0
+	// Use worker pool for parallel scanning
+	jobs := make(chan string, 100)
+	var wg sync.WaitGroup
+
+	// Start 50 workers
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for ip := range jobs {
+				if d.isStopping() {
+					return
+				}
+				target := &net.UDPAddr{IP: net.ParseIP(ip), Port: d.cfg.DiscoveryPort}
+				conn.WriteToUDP(payload, target)
+			}
+		}()
+	}
+
+	// Send jobs for all IPs in range
+	for subnet := startSubnet; subnet <= endSubnet; subnet++ {
+		if subnet == localSubnet {
+			continue // Skip our own subnet, broadcast handles it
+		}
+		for host := 1; host <= 254; host++ {
+			if d.isStopping() {
+				break
+			}
+			ip := fmt.Sprintf("192.168.%d.%d", subnet, host)
+			jobs <- ip
+			sent++
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	return sent
+}
+
+// StartupScan performs initial scan of common university subnets.
+// Called automatically when Bonjou starts.
+func (d *DiscoveryService) StartupScan() {
+	if d.isStopping() {
+		return
+	}
+	// Scan subnets 1-20 on startup (covers most university labs)
+	go func() {
+		time.Sleep(2 * time.Second) // Wait for listener to be ready
+		d.ScanSubnets(1, 20)
+	}()
+}
+
 // SharedSecret retrieves the most recent secret advertised by a peer.
 func (d *DiscoveryService) SharedSecret(username, ip string) (string, bool) {
 	d.mu.RLock()
@@ -235,11 +357,41 @@ func (d *DiscoveryService) listenLoop() {
 		if ann.IP == localIP && ann.Port == localPort {
 			continue
 		}
+
+		// Check if this is a new peer (cross-subnet connection)
+		d.mu.RLock()
+		_, existed := d.peers[ann.IP]
+		d.mu.RUnlock()
+
 		peer := &Peer{Username: ann.Username, IP: ann.IP, Port: ann.Port, LastSeen: time.Now(), Secret: ann.Secret}
 		d.mu.Lock()
 		d.peers[peer.IP] = peer
 		d.mu.Unlock()
+
+		// If this is a new peer, send our announcement back directly
+		// This enables two-way discovery across subnets
+		if !existed {
+			go d.sendDirectAnnouncement(ann.IP)
+		}
 	}
+}
+
+// sendDirectAnnouncement sends our info directly to a specific IP
+func (d *DiscoveryService) sendDirectAnnouncement(ip string) {
+	if d.isStopping() {
+		return
+	}
+	payload, ok := d.prepareAnnouncement()
+	if !ok {
+		return
+	}
+	conn, err := net.ListenUDP("udp4", nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	target := &net.UDPAddr{IP: net.ParseIP(ip), Port: d.cfg.DiscoveryPort}
+	conn.WriteToUDP(payload, target)
 }
 
 func (d *DiscoveryService) announceLoop() {

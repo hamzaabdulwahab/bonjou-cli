@@ -9,6 +9,7 @@ Bonjou is a terminal-based chat app for local networks. You can send messages an
 - Works on Mac, Linux, and Windows
 - No server needed - everything stays on your local network
 - Simple commands starting with `@`
+- Auto-discovers users across different labs/subnets
 
 ## Quick Start
 
@@ -40,7 +41,7 @@ Or download from [Releases](https://github.com/hamzaabdulwahab/bonjou-terminal/r
 bonjou
 ```
 
-You will see something like:
+You will see:
 ```
 🌐 Welcome to Bonjou v1.0.0
 👤 User: hamza | IP: 192.168.1.5
@@ -56,9 +57,18 @@ Type @help for commands.
 @file alex ~/report.pdf         # send a file
 @folder alex ./my-folder        # send a folder
 @broadcast Meeting in 5 mins    # message everyone
+@scan                           # find users in other labs
 @help                           # see all commands
 @exit                           # quit
 ```
+
+## Cross-Lab Discovery
+
+Bonjou automatically scans nearby subnets when it starts. Users in different labs (like 192.168.1.x and 192.168.6.x) should appear in `@users` within a few seconds.
+
+**Not seeing someone?**
+- Run `@scan` to search all subnets (~2 minutes)
+- Or use `@connect <ip>` if you know their IP (instant)
 
 ## Build From Source
 
@@ -70,45 +80,38 @@ cd bonjou-terminal
 go run ./cmd/bonjou
 ```
 
-To build binaries for all platforms:
+To build binaries:
 ```bash
 ./scripts/build.sh
 ```
 
 ## How It Works
 
-- Bonjou finds other users using UDP broadcasts on port 46320
+- Bonjou finds other users using UDP on port 46320
 - Messages and files go through TCP on port 46321
 - Files you receive go to `~/.bonjou/received/`
-- Your settings are saved in `~/.bonjou/config.json`
-
-## Project Structure
-
-```
-cmd/bonjou/     - main app entry point
-internal/
-  commands/     - handles @ commands
-  config/       - saves/loads settings
-  network/      - discovery and file transfer
-  ui/           - terminal interface
-  history/      - chat logs
-```
+- Settings saved in `~/.bonjou/config.json`
 
 ## Troubleshooting
 
-**Can not see other users?**
+**Can not see other users in same lab?**
 - Make sure you are on the same network
 - Check if firewall is blocking ports 46320 and 46321
 
+**Can not see users in different lab?**
+- Wait a few seconds for auto-scan to complete
+- Run `@scan` to search all subnets
+- Use `@connect <their-ip>` if you know their IP
+
 **File transfer failed?**
 - Wait for user to show up in @users first
-- Check if both have the same version with bonjou --version
+- Check version with `bonjou --version`
 
 ## More Info
 
-- [Install Guide](docs/install-guide.md) - detailed install steps
-- [Command Reference](HELP.md) - all commands explained
-- [Demo](docs/demo-simulation.md) - example session
+- [Commands](HELP.md)
+- [Install Guide](docs/install-guide.md)
+- [Demo](docs/demo-simulation.md)
 
 ## License
 
