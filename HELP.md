@@ -1,47 +1,74 @@
-# Bonjou Command Reference
+# Bonjou Commands
 
-Bonjou runs entirely from an interactive prompt. Every action is triggered with an `@` prefixed command.
+All commands start with `@`. Type them in the Bonjou terminal.
 
-## Core Commands
+## Basic Commands
 
-- `@help` – show this help summary inside Bonjou.
-- `@whoami` – print the configured username, IP address, and listening ports.
-- `@users` – list discovered LAN peers that announced themselves in the last 15 seconds.
-- `@status` – display runtime information such as storage paths and port usage.
-- `@history` – dump chat and transfer history from `~/.bonjou/logs`.
-- `@clear` – clear the terminal and redraw the welcome banner.
-- `@exit` – leave the Bonjou session gracefully.
+| Command | What it does |
+|---------|-------------|
+| `@help` | Show this help |
+| `@whoami` | Show your username and IP |
+| `@users` | List people on the network |
+| `@status` | Show app info and paths |
+| `@history` | Show past messages |
+| `@clear` | Clear the screen |
+| `@exit` | Quit Bonjou |
 
-## Messaging
+## Sending Messages
 
-- `@send <user|ip> <message>` – send a plain text message to the specified user or IPv4 address.
-- `@multi <user1,user2,...> <message>` – deliver a text message (or file/folder, see below) to multiple recipients.
-- `@broadcast <message>` – send a text message to every discovered peer.
-
-## Transfers
-
-- `@file <user|ip> <path>` – send a single file. Relative paths are resolved from the current working directory.
-- `@folder <user|ip> <path>` – send a directory; Bonjou compresses it before transfer and extracts on the recipient.
-- `@multi <user1,user2,...> <path>` – if `<path>` points to a file or directory, Bonjou sends that artifact to each peer.
-
-Transfers stream over TCP with integrity validation. Real-time progress updates appear in the prompt area. Received content lands in:
-
+**To one person:**
 ```
-~/.bonjou/received/files
-~/.bonjou/received/folders
+@send alex Hey, how are you?
 ```
 
-## Storage and Paths
+**To multiple people:**
+```
+@multi alex,bob Meeting at 3pm
+```
 
-- `@setpath <dir>` – change the base directory used for incoming transfers. Bonjou creates `files/` and `folders/` subdirectories automatically and updates `config.json`.
+**To everyone:**
+```
+@broadcast Lunch break!
+```
 
-## Updating
+You can use their username or IP address.
 
-- `@update` – execute `bonjou-update` if available on `PATH`, or `~/.bonjou/update.sh` if present. Useful for offline / LAN-hosted repositories.
+## Sending Files
+
+**Send a file:**
+```
+@file alex ~/Documents/report.pdf
+```
+
+**Send a folder:**
+```
+@folder alex ./my-project
+```
+
+**Send to multiple people:**
+```
+@multi alex,bob ~/photo.jpg
+```
+
+Files are received in:
+- `~/.bonjou/received/files/`
+- `~/.bonjou/received/folders/`
+
+## Settings
+
+**Change your username:**
+```
+@setname john
+```
+
+**Change where files are saved:**
+```
+@setpath ~/Downloads/bonjou
+```
 
 ## Tips
 
-- Use usernames for readability; Bonjou maps usernames to IPs via LAN discovery.
-- To target a device directly, supply the IPv4 address (Bonjou assumes the default port 46321).
-- When transferring folders, ensure you have permission to read every file inside the directory tree.
-- History data can become large on long-lived hosts; clear it by deleting the log files or using `@clear` and removing them manually.
+- Wait for people to show up in `@users` before sending to them
+- Use quotes for paths with spaces: `@file alex "~/My Documents/file.pdf"`
+- Use `~` for home directory
+- Run `bonjou --version` to check version without opening the app

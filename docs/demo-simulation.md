@@ -1,91 +1,107 @@
-# Bonjou Demo Simulation
+# Bonjou Demo
 
-This walkthrough demonstrates a LAN chat + file/folder transfer between two hosts named **alex-laptop** and **jamie-desktop**. Repeat the steps on real machines or two terminals on the same computer using loopback IPs.
+This shows how to use Bonjou between two computers. You can also test on one computer using two terminal windows.
 
-## Preparation
+## Setup
 
-1. Build Bonjou binaries via `./scripts/build.sh`.
-2. Install the binary on both devices (copy the appropriate executable to `/usr/local/bin/bonjou` on Linux/macOS or `C:\\Tools\\bonjou.exe` on Windows).
-3. Make sure UDP port `46320` and TCP port `46321` are open on local firewalls.
+1. Install Bonjou on both computers
+2. Make sure both are on the same WiFi/network
+3. Open firewall ports 46320 (UDP) and 46321 (TCP)
 
-## Session 1 – alex-laptop
+## Example Session
 
+### Computer 1 (Alex)
+
+Start Bonjou:
 ```bash
 bonjou
-# Banner displays
+```
+
+Check your info:
+```
 @whoami
 ```
-
-Output example:
-
+Output:
 ```
 Username: alex
-IP: 192.168.1.34
-Listen port: 46321
+IP: 192.168.1.10
+Port: 46321
 ```
 
-Leave Bonjou running on alex-laptop.
+### Computer 2 (Jamie)
 
-## Session 2 – jamie-desktop
-
+Start Bonjou:
 ```bash
 bonjou
-@users           # discovers alex-laptop via UDP broadcasts
-@send alex Hey Alex, testing Bonjou from Jamie.
 ```
 
-alex-laptop should now display the incoming message in real time.
-
-## File Transfer
-
-On jamie-desktop:
-
-```bash
-@file alex ~/Pictures/nano-drone.jpg
+See who is on the network:
+```
+@users
+```
+Output:
+```
+alex (192.168.1.10)
 ```
 
-Progress percentages appear on both terminals. When complete, alex finds the file at:
-
+Send a message:
 ```
-~/.bonjou/received/files/nano-drone.jpg
-```
-
-## Folder Transfer
-
-On alex-laptop:
-
-```bash
-@folder jamie ./docs/release-notes
+@send alex Hey Alex!
 ```
 
-Bonjou zips the folder, streams it to jamie, and extracts it under:
+Alex will see the message appear.
+
+## Send a File
+
+On Jamie's computer:
+```
+@file alex ~/Documents/notes.pdf
+```
+
+You will see progress:
+```
+Sending notes.pdf... 45%... 100% done
+```
+
+Alex receives it in:
+```
+~/.bonjou/received/files/notes.pdf
+```
+
+## Send a Folder
+
+On Alex's computer:
+```
+@folder jamie ./project-files
+```
+
+Bonjou zips the folder, sends it, and unzips on the other side.
+
+Jamie receives it in:
+```
+~/.bonjou/received/folders/project-files/
+```
+
+## Message Everyone
 
 ```
-~/.bonjou/received/folders/release-notes
+@broadcast Break time in 5 minutes!
 ```
 
-## Broadcast and History
+Everyone on the network sees this message.
 
-On jamie-desktop:
+## Check History
 
-```bash
-@broadcast Maintenance window starts in 5 minutes.
+```
 @history
 ```
 
-Both systems log the broadcast and previous transfers in `~/.bonjou/logs/`.
+Shows all past messages and transfers.
 
-## Update Command
+## Exit
 
-Place an executable script at `~/.bonjou/update.sh` on both hosts:
-
-```bash
-#!/usr/bin/env bash
-echo "Simulating update..."
+```
+@exit
 ```
 
-Then run `@update` inside Bonjou. The script executes, demonstrating the offline-update workflow.
-
-## Cleanup
-
-Use `@exit` on both terminals to end sessions. Optional: clear logs by deleting files in `~/.bonjou/logs`.
+Closes Bonjou.

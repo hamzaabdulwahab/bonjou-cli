@@ -1,136 +1,115 @@
 # Bonjou
 
-Bonjou is a cross-platform, terminal-based LAN chat and transfer application written in Go. It keeps teams chatting and sharing files even when the wider Internet is offline, as long as devices share the same local network.
+Bonjou is a terminal-based chat app for local networks. You can send messages and files to other computers on the same WiFi or LAN without needing internet.
 
-## Features
+## What It Does
 
-- 🔌 Works entirely on LAN – no central server required.
-- 💬 Low-friction terminal UI with command-driven interactions.
-- 📁 Fast file and folder transfer with automatic compression, checksums, and progress updates.
-- 📡 Peer discovery over UDP broadcasts; encrypted integrity checks over TCP for data transport.
-- 🗃️ Persistent logs and received files stored under `~/.bonjou/`.
-- 📦 Cross-compiled binaries for Linux, macOS, and Windows with packaging artefacts for APT, Homebrew, and Scoop.
+- Chat with people on the same network
+- Send files and folders
+- Works on Mac, Linux, and Windows
+- No server needed - everything stays on your local network
+- Simple commands starting with `@`
 
-## Getting Started
-
-### Prerequisites
-
-- Go 1.21+
-- Optional: `dpkg-deb` for building `.deb` packages on Linux or macOS.
-
-### Build from Source
-
-```bash
-cd bonjou-terminal
-./scripts/build.sh
-```
-
-The script produces platform binaries in `dist/bin/`:
-
-- `bonjou-linux`
-- `bonjou-macos`
-- `bonjou.exe`
-
-### Package for Distribution
-
-```bash
-./scripts/package.sh
-```
-
-Outputs:
-
-- Debian package: `dist/deb/bonjou_1.0.0_amd64.deb`
-- Homebrew formula: `dist/homebrew/bonjou.rb`
-- Scoop manifest: `dist/scoop/bonjou.json`
-
-Update the placeholder download URLs and SHA256 values in the manifests before publishing.
+## Quick Start
 
 ### Install
 
-#### Linux (.deb)
-
+**Mac (Homebrew):**
 ```bash
-sudo apt install ./dist/deb/bonjou_1.0.0_amd64.deb
-```
-
-#### macOS (Homebrew)
-
-```bash
-brew tap bonjou/local /path/to/bonjou-terminal/packaging/homebrew
+brew tap hamzaabdulwahab/bonjou https://github.com/hamzaabdulwahab/homebrew-bonjou
 brew install bonjou
 ```
 
-#### Windows (Scoop)
-
+**Windows (Scoop):**
 ```powershell
-scoop bucket add bonjou /path/to/packaging/scoop
+scoop bucket add bonjou https://github.com/hamzaabdulwahab/scoop-bonjou
 scoop install bonjou
 ```
 
-### Offline / LAN Distribution
+**Linux (.deb):**
+```bash
+wget https://github.com/hamzaabdulwahab/bonjou-terminal/releases/download/v1.0.0/bonjou_1.0.0_amd64.deb
+sudo dpkg -i bonjou_1.0.0_amd64.deb
+```
 
-Share the `dist/` folder on the local network (via SMB/NFS/HTTP). Peers can install using the same steps above, pointing to the shared path. For updates, publish a refreshed build into the shared folder and run `@update` inside Bonjou to execute the supplied update script (`bonjou-update` or `~/.bonjou/update.sh`).
-The provided [`scripts/update.sh`](scripts/update.sh) can be adapted and hosted centrally as `bonjou-update` for automatic LAN updates.
+Or download from [Releases](https://github.com/hamzaabdulwahab/bonjou-terminal/releases).
 
-## Usage
-
-Launch Bonjou after installation:
+### Run
 
 ```bash
 bonjou
 ```
 
-Opening banner:
-
+You will see something like:
 ```
-🌐 Welcome to Bonjou v1.0
-👤 User: <username> | IP: <ip>
+🌐 Welcome to Bonjou v1.0.0
+👤 User: hamza | IP: 192.168.1.5
 📡 LAN: Connected
 Type @help for commands.
 ```
 
-All interactions rely on `@commands`. See [HELP.md](HELP.md) for the complete reference. Common examples:
+### Basic Commands
 
 ```
-@send alice Hello from lab PC!
-@file 192.168.1.23 ~/Documents/report.pdf
-@folder alice ./project-notes
-@broadcast Evening maintenance window starts in 10 minutes.
-@history
+@users                          # see who is on the network
+@send alex Hello!               # send message to alex
+@file alex ~/report.pdf         # send a file
+@folder alex ./my-folder        # send a folder
+@broadcast Meeting in 5 mins    # message everyone
+@help                           # see all commands
+@exit                           # quit
 ```
 
-Received files arrive under:
+## Build From Source
+
+Need Go 1.21 or newer.
+
+```bash
+git clone https://github.com/hamzaabdulwahab/bonjou-terminal.git
+cd bonjou-terminal
+go run ./cmd/bonjou
+```
+
+To build binaries for all platforms:
+```bash
+./scripts/build.sh
+```
+
+## How It Works
+
+- Bonjou finds other users using UDP broadcasts on port 46320
+- Messages and files go through TCP on port 46321
+- Files you receive go to `~/.bonjou/received/`
+- Your settings are saved in `~/.bonjou/config.json`
+
+## Project Structure
 
 ```
-~/.bonjou/received/files
-~/.bonjou/received/folders
+cmd/bonjou/     - main app entry point
+internal/
+  commands/     - handles @ commands
+  config/       - saves/loads settings
+  network/      - discovery and file transfer
+  ui/           - terminal interface
+  history/      - chat logs
 ```
 
-Logs live in `~/.bonjou/logs`. Use `@setpath <dir>` to move incoming storage elsewhere.
+## Troubleshooting
 
-## Architecture Overview
+**Can not see other users?**
+- Make sure you are on the same network
+- Check if firewall is blocking ports 46320 and 46321
 
-- **cmd/bonjou** – entry point wiring configuration, services, and UI.
-- **internal/config** – persistent configuration management.
-- **internal/network** – UDP peer discovery and TCP transfer server/client.
-- **internal/commands** – command parser and dispatcher.
-- **internal/ui** – ANSI-enhanced terminal interface and event loop.
-- **internal/history** – log persistence for chats and transfers.
-- **internal/events** – typed event bus used by background services.
+**File transfer failed?**
+- Wait for user to show up in @users first
+- Check if both have the same version with bonjou --version
 
-Discovery broadcasts JSON beacons over UDP port `46320`. Transfers occur over TCP port `46321` with HMAC-SHA256 integrity checks. Folder deliveries are zipped on the fly, transferred, then extracted when received.
+## More Info
 
-## Testing
-
-Manual testing is the most representative. Try the [demo scenario](docs/demo-simulation.md) to simulate two hosts on the same network. Automated coverage can be expanded with Go unit tests for configuration, command parsing, and protocol helpers.
-
-## Contributing
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Run `gofmt ./...` and `go test ./...`.
-4. Submit a pull request with a clear summary.
+- [Install Guide](docs/install-guide.md) - detailed install steps
+- [Command Reference](HELP.md) - all commands explained
+- [Demo](docs/demo-simulation.md) - example session
 
 ## License
 
-MIT. See `LICENSE` (add one if redistributing publicly).
+MIT
