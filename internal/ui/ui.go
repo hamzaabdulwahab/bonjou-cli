@@ -5,7 +5,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -402,24 +401,19 @@ func (u *UI) colorizePath(path string) string {
 }
 
 func (u *UI) progressTarget(ps *events.ProgressState, limit int) string {
-	raw := strings.TrimSpace(ps.Path)
-	if raw == "" {
-		raw = strings.TrimSpace(ps.Label)
+	var label string
+	switch strings.ToLower(ps.Kind) {
+	case "file":
+		label = "File"
+	case "folder":
+		label = "Folder"
+	case "message":
+		label = "Message"
+	default:
+		label = "Transfer"
 	}
-	if raw == "" {
-		raw = strings.TrimSpace(ps.ID)
-	}
-	if raw == "" {
-		raw = "(unknown)"
-	}
-	display := raw
-	base := filepath.Base(raw)
-	if base != "" && base != "." && base != string(os.PathSeparator) {
-		display = base
-	}
-	display = truncateMiddle(display, limit)
-	colored := u.colorizePath(display)
 	glyph := progressKindGlyph(ps.Kind, ps.Direction)
+	colored := colorPrimary + label + colorReset
 	if glyph == "" {
 		return colored
 	}

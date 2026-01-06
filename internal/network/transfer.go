@@ -113,7 +113,14 @@ func (t *TransferService) Start(username, ip string) error {
 	addr := fmt.Sprintf(":%d", t.cfg.ListenPort)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return err
+		// Provide helpful error message for port conflicts
+		if strings.Contains(err.Error(), "address already in use") {
+			return fmt.Errorf("port %d is already in use - another Bonjou instance or application may be running. Error: %v", t.cfg.ListenPort, err)
+		}
+		if strings.Contains(err.Error(), "permission denied") {
+			return fmt.Errorf("permission denied to listen on port %d - you may need to use a port >1024 or run with elevated privileges. Error: %v", t.cfg.ListenPort, err)
+		}
+		return fmt.Errorf("failed to start transfer service on port %d: %v", t.cfg.ListenPort, err)
 	}
 	t.listener = ln
 	t.localMu.Lock()
@@ -437,6 +444,20 @@ func (t *TransferService) receiveFile(conn net.Conn, env *envelope, key []byte) 
 		return errServiceStopping
 	}
 	destPath := uniquePath(filepath.Join(t.cfg.ReceivedFilesDir, env.Name))
+	
+	// Security: Prevent path traversal attacks
+	absDestPath, err := filepath.Abs(destPath)
+	if err != nil {
+		return fmt.Errorf("invalid path: %v", err)
+	}
+	absDirPath, err := filepath.Abs(t.cfg.ReceivedFilesDir)
+	if err != nil {
+		return fmt.Errorf("invalid destination directory: %v", err)
+	}
+	if !strings.HasPrefix(absDestPath, absDirPath) {
+		return fmt.Errorf("path traversal not allowed: file would be written outside received directory")
+	}
+	
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
 		return err
 	}
@@ -534,10 +555,25 @@ func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte
 		return errors.New("checksum mismatch")
 	}
 	destDir := uniquePath(displayPath)
+	
+	// Security: Prevent path traversal attacks
+	absDestDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return fmt.Errorf("invalid path: %v", err)
+	}
+	absFolderPath, err := filepath.Abs(t.cfg.ReceivedFoldersDir)
+	if err != nil {
+		return fmt.Errorf("invalid destination directory: %v", err)
+	}
+	if !strings.HasPrefix(absDestDir, absFolderPath) {
+		return fmt.Errorf("path traversal not allowed: folder would be written outside received directory")
+	}
+	
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return err
 	}
 	if err := unzip(tempPath, destDir); err != nil {
+		_ = os.RemoveAll(destDir)  // Clean up partially extracted folder on failure
 		return err
 	}
 	t.emit(events.Event{Type: events.FolderReceived, Title: "Folder received", Message: destDirName, From: env.From, Path: destDir, Size: env.Size, Timestamp: time.Now()})

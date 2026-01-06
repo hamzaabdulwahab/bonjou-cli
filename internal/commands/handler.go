@@ -53,10 +53,6 @@ func (h *Handler) Handle(input string) (Result, error) {
 		return h.cmdWhoAmI()
 	case "users":
 		return h.cmdUsers()
-	case "connect":
-		return h.cmdConnect(args)
-	case "scan":
-		return h.cmdScan()
 	case "send":
 		return h.cmdSend(parts, args)
 	case "file":
@@ -104,34 +100,6 @@ func (h *Handler) cmdUsers() (Result, error) {
 		lines = append(lines, fmt.Sprintf("%s (%s) • %s", safePeerLabel(peer.Username), peer.IP, seen))
 	}
 	return Result{Output: strings.Join(lines, "\n")}, nil
-}
-
-func (h *Handler) cmdConnect(args string) (Result, error) {
-	ip := strings.TrimSpace(args)
-	if ip == "" {
-		return Result{Output: "Usage: @connect <ip>\nConnect to a peer on a different subnet."}, nil
-	}
-	if net.ParseIP(ip) == nil {
-		return Result{Output: "Invalid IP address."}, nil
-	}
-	if err := h.session.Discovery.AddManualPeer(ip, h.session.Config.ListenPort); err != nil {
-		return Result{}, err
-	}
-	return Result{Output: fmt.Sprintf("Sent connection request to %s. If they are running Bonjou, they will appear in @users shortly.", ip)}, nil
-}
-
-func (h *Handler) cmdScan() (Result, error) {
-	// Scan all subnets in the local network range (1-255)
-	// For 10.x.x.x networks, also scans nearby second octets (±5)
-	go func() {
-		h.session.Discovery.ScanSubnets(1, 255)
-	}()
-	localIP := h.session.LocalIP()
-	parts := strings.Split(localIP, ".")
-	if len(parts) >= 2 && parts[0] == "10" {
-		return Result{Output: fmt.Sprintf("Scanning subnets 10.%s-±5.x.x... This may take a few minutes.\nBonjou users will appear in @users as they respond.", parts[1])}, nil
-	}
-	return Result{Output: fmt.Sprintf("Scanning all subnets in %s.%s.x.x... This takes about 2 minutes.\nBonjou users will appear in @users as they respond.", parts[0], parts[1])}, nil
 }
 
 func (h *Handler) cmdSend(parts []string, args string) (Result, error) {
@@ -242,6 +210,17 @@ func (h *Handler) cmdMulti(parts []string, args string) (Result, error) {
 	if len(targets) == 0 {
 		return Result{Output: "No valid targets specified"}, nil
 	}
+
+	// Deduplicate targets to avoid sending multiple times to the same peer
+	seen := make(map[string]bool)
+	var uniqueTargets []string
+	for _, target := range targets {
+		if !seen[target] {
+			seen[target] = true
+			uniqueTargets = append(uniqueTargets, target)
+		}
+	}
+	targets = uniqueTargets
 
 	var errs []string
 	var success int
@@ -704,10 +683,6 @@ func helpText() string {
 	b.WriteString(heading + "Discovery & Status" + reset + "\n")
 	b.WriteString("  " + accent + "@users" + reset + "\n")
 	b.WriteString("    List online peers with last-seen timestamps." + "\n")
-	b.WriteString("  " + accent + "@scan" + reset + "\n")
-	b.WriteString("    Scan all subnets to find Bonjou users in other labs." + "\n")
-	b.WriteString("  " + accent + "@connect <ip>" + reset + "\n")
-	b.WriteString("    Connect directly to a peer if you know their IP." + "\n")
 	b.WriteString("  " + accent + "@whoami" + reset + "\n")
 	b.WriteString("    Show your username, LAN IP, and listening port." + "\n")
 	b.WriteString("  " + accent + "@setname <username>" + reset + "\n")

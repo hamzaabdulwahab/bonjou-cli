@@ -9,7 +9,7 @@ Bonjou is a terminal-based chat app for local networks. You can send messages an
 - Works on Mac, Linux, and Windows
 - No server needed - everything stays on your local network
 - Simple commands starting with `@`
-- Auto-discovers users across different labs/subnets
+- Auto-discovers users on the same subnet
 
 ## Quick Start
 
@@ -62,18 +62,13 @@ Type @help for commands.
 @file alex ~/report.pdf         # send a file
 @folder alex ./my-folder        # send a folder
 @broadcast Meeting in 5 mins    # message everyone
-@scan                           # find users in other labs
 @help                           # see all commands
 @exit                           # quit
 ```
 
-## Cross-Lab Discovery
+## Discovery Scope
 
-Bonjou automatically scans nearby subnets when it starts. Users in different labs (like 192.168.1.x and 192.168.6.x) should appear in `@users` within a few seconds.
-
-**Not seeing someone?**
-- Run `@scan` to search all subnets (~2 minutes)
-- Or use `@connect <ip>` if you know their IP (instant)
+Bonjou is designed to work when devices are on the same subnet (same LAN/Wi‑Fi network segment). It uses UDP broadcast for discovery, which generally does not cross routers.
 
 ## Build From Source
 
@@ -104,9 +99,8 @@ To build binaries:
 - Check if firewall is blocking ports 46320 and 46321
 
 **Can not see users in different lab?**
-- Wait a few seconds for auto-scan to complete
-- Run `@scan` to search all subnets
-- Use `@connect <their-ip>` if you know their IP
+- Bonjou discovery is same-subnet only
+- Make sure both devices are on the same Wi‑Fi/LAN and not separated by a router/VLAN
 
 **File transfer failed?**
 - Wait for user to show up in @users first

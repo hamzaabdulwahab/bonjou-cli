@@ -73,6 +73,10 @@ func Default() *Config {
 	if username == "" {
 		username = "bonjou-user"
 	}
+	// Truncate username to max 64 bytes if it exceeds limit
+	if len(username) > 64 {
+		username = username[:64]
+	}
 	secret := randomHex(32)
 	cfg := &Config{
 		Username:           username,

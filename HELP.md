@@ -54,29 +54,11 @@ Files are received in:
 - `~/.bonjou/received/files/`
 - `~/.bonjou/received/folders/`
 
-## Finding Users in Other Labs
+## Discovery Limits
 
 Bonjou announces itself automatically. On the same subnet, users appear quickly via UDP broadcast.
 
-Across different subnets (for example `10.23.x.x` and `10.24.x.x`), broadcast does not cross routers, so Bonjou uses scanning and direct (unicast) announcements.
-
-On startup Bonjou does a quick scan of nearby subnets. Users in other labs should appear in `@users` within about 1-2 minutes.
-
-**If someone is not showing up:**
-
-```
-@scan
-```
-
-This scans ALL subnets (1-255) in your network and takes about 2 minutes.
-
-**If you know their IP:**
-
-```
-@connect 10.23.81.71
-```
-
-This is faster - sends your info directly to them. Bonjou will also keep sending periodic direct announcements so you both stay visible across subnets.
+Bonjou discovery is same-subnet only (UDP broadcast generally does not cross routers/VLANs). If someone is not showing up, ensure both devices are on the same Wi‑Fi/LAN segment and that firewall rules allow UDP/TCP on the app ports.
 
 ## Settings
 
@@ -93,8 +75,7 @@ This is faster - sends your info directly to them. Bonjou will also keep sending
 ## Tips
 
 - Same lab: users appear automatically in `@users`
-- Different lab: wait 2-3 minutes for auto-scan, or use `@scan`
-- Know their IP? Use `@connect <ip>` for faster connection
+- Different lab/subnet: not supported (move both devices to the same subnet)
 - Use quotes for paths with spaces: `@file alex "~/My Documents/file.pdf"`
 - Use `~` for home directory
 - Run `bonjou --version` to check version

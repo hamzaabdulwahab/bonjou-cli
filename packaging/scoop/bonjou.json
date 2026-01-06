@@ -5,8 +5,8 @@
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou-windows.zip",
-      "hash": "2677a5b41ec65aee2e48faf32053e269a1ffd681c94ed83fb908e87b897c002f",
+      "url": "https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.0.0/bonjou.exe",
+      "hash": "0fa650f52a7299886b5491df755c082c88b65b1903a44b1385aec4350e7daf2f",
       "bin": "bonjou.exe"
     }
   },
@@ -17,7 +17,7 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v$version/bonjou-windows.zip"
+        "url": "https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v$version/bonjou.exe"
       }
     }
   }
