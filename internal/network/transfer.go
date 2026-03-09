@@ -255,24 +255,33 @@ func (t *TransferService) SendFile(peer *Peer, path string) error {
 	localUser, localIP := t.identity()
 	info, err := os.Stat(path)
 	if err != nil {
-		return err
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file not found: %s", filepath.Base(path))
+		}
+		return fmt.Errorf("cannot access file: %v", err)
 	}
 	if info.IsDir() {
-		return errors.New("path is a directory; use SendFolder")
+		return errors.New("path is a directory — use @folder to send a folder")
 	}
-	checksum, err := fileChecksum(path)
+	// Open the file once to atomically derive its size, checksum, and the
+	// byte stream that will be sent.  This prevents the race where the
+	// file could be modified between a separate stat/checksum call and
+	// the subsequent stream, which would cause a checksum mismatch on the
+	// receiver side even though the send itself looked successful.
+	tf, err := openTransferFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot read file for transfer: %v", err)
 	}
+	defer tf.file.Close()
 	env := &envelope{
 		Kind:      kindFile,
 		From:      localUser,
 		FromIP:    localIP,
 		To:        peer.Username,
 		Name:      filepath.Base(path),
-		Size:      info.Size(),
+		Size:      tf.size,
 		Timestamp: time.Now().Unix(),
-		Checksum:  checksum,
+		Checksum:  tf.checksum,
 	}
 	stream := func(writer io.Writer, enc cipher.Stream) error {
 		ctx := progressContext{
@@ -283,7 +292,7 @@ func (t *TransferService) SendFile(peer *Peer, path string) error {
 			direction: "send",
 			kind:      kindFile,
 		}
-		return t.copyWithProgress(writer, enc, path, env.Size, ctx)
+		return t.copyWithProgress(writer, enc, tf.file, tf.size, ctx)
 	}
 	if err := t.sendEnvelope(peer, env, stream); err != nil {
 		t.emitTransferIssue(kindFile, env.Name, peer.Username, path, err)
@@ -301,24 +310,26 @@ func (t *TransferService) SendFolder(peer *Peer, dir string) error {
 	localUser, localIP := t.identity()
 	info, err := os.Stat(dir)
 	if err != nil {
-		return err
+		if os.IsNotExist(err) {
+			return fmt.Errorf("folder not found: %s", filepath.Base(dir))
+		}
+		return fmt.Errorf("cannot access folder: %v", err)
 	}
 	if !info.IsDir() {
-		return errors.New("path is not a directory")
+		return errors.New("path is not a directory — use @file to send a single file")
 	}
 	archivePath, err := zipDirectory(dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to compress folder for transfer: %v", err)
 	}
 	defer os.Remove(archivePath)
-	archiveInfo, err := os.Stat(archivePath)
+	// Open the archive once to atomically derive its size, checksum, and
+	// the byte stream to send — same race-elimination rationale as SendFile.
+	tf, err := openTransferFile(archivePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot read compressed archive for transfer: %v", err)
 	}
-	checksum, err := fileChecksum(archivePath)
-	if err != nil {
-		return err
-	}
+	defer tf.file.Close()
 	displayName := filepath.Base(dir)
 	env := &envelope{
 		Kind:      kindFolder,
@@ -326,9 +337,9 @@ func (t *TransferService) SendFolder(peer *Peer, dir string) error {
 		FromIP:    localIP,
 		To:        peer.Username,
 		Name:      displayName + ".zip",
-		Size:      archiveInfo.Size(),
+		Size:      tf.size,
 		Timestamp: time.Now().Unix(),
-		Checksum:  checksum,
+		Checksum:  tf.checksum,
 	}
 	stream := func(writer io.Writer, enc cipher.Stream) error {
 		ctx := progressContext{
@@ -339,7 +350,7 @@ func (t *TransferService) SendFolder(peer *Peer, dir string) error {
 			direction: "send",
 			kind:      kindFolder,
 		}
-		return t.copyWithProgress(writer, enc, archivePath, env.Size, ctx)
+		return t.copyWithProgress(writer, enc, tf.file, tf.size, ctx)
 	}
 	if err := t.sendEnvelope(peer, env, stream); err != nil {
 		t.emitTransferIssue(kindFolder, displayName, peer.Username, dir, err)
@@ -547,14 +558,20 @@ func (t *TransferService) receiveFile(conn net.Conn, env *envelope, key []byte) 
 		if err := t.writeInlineDeliveryAck(conn, key, env, kindFile, env.Name, "error"); err != nil {
 			t.sendDeliveryAckOutOfBand(env, kindFile, env.Name, "error")
 		}
-		t.emit(events.Event{Type: events.Error, Title: "Checksum mismatch", Message: env.Name, From: env.From, Timestamp: time.Now(), Path: destPath})
-		return errors.New("checksum mismatch")
+		msg := fmt.Sprintf("File '%s' from %s did not arrive intact — data was corrupted in transit. Please ask them to send it again.", env.Name, env.From)
+		t.emit(events.Event{Type: events.Error, Title: "Transfer integrity check failed", Message: msg, From: env.From, Timestamp: time.Now(), Path: destPath})
+		return fmt.Errorf("transfer integrity check failed for '%s'", env.Name)
 	}
 	cleanup = false
 	if err := t.writeInlineDeliveryAck(conn, key, env, kindFile, env.Name, "ok"); err != nil {
 		t.sendDeliveryAckOutOfBand(env, kindFile, env.Name, "ok")
 	}
-	t.emit(events.Event{Type: events.FileReceived, Title: "File received", Message: env.Name, From: env.From, Path: destPath, Size: env.Size, Timestamp: time.Now()})
+	savedName := filepath.Base(destPath)
+	displayMsg := env.Name
+	if savedName != env.Name {
+		displayMsg = fmt.Sprintf("%s (saved as '%s' — a file with this name already existed)", env.Name, savedName)
+	}
+	t.emit(events.Event{Type: events.FileReceived, Title: "File received", Message: displayMsg, From: env.From, Path: destPath, Size: env.Size, Timestamp: time.Now()})
 	localUser, _ := t.identity()
 	return t.history.AppendTransfer(env.From, localUser, destPath, env.Size, kindFile)
 }
@@ -605,8 +622,9 @@ func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte
 		if err := t.writeInlineDeliveryAck(conn, key, env, kindFolder, strings.TrimSuffix(env.Name, ".zip"), "error"); err != nil {
 			t.sendDeliveryAckOutOfBand(env, kindFolder, strings.TrimSuffix(env.Name, ".zip"), "error")
 		}
-		t.emit(events.Event{Type: events.Error, Title: "Checksum mismatch", Message: destDirName, From: env.From, Timestamp: time.Now(), Path: tempPath})
-		return errors.New("checksum mismatch")
+		msg := fmt.Sprintf("Folder '%s' from %s did not arrive intact — data was corrupted in transit. Please ask them to send it again.", destDirName, env.From)
+		t.emit(events.Event{Type: events.Error, Title: "Transfer integrity check failed", Message: msg, From: env.From, Timestamp: time.Now(), Path: tempPath})
+		return fmt.Errorf("transfer integrity check failed for folder '%s'", destDirName)
 	}
 	destDir := uniquePath(displayPath)
 
@@ -636,17 +654,17 @@ func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte
 	if err := t.writeInlineDeliveryAck(conn, key, env, kindFolder, destDirName, "ok"); err != nil {
 		t.sendDeliveryAckOutOfBand(env, kindFolder, destDirName, "ok")
 	}
-	t.emit(events.Event{Type: events.FolderReceived, Title: "Folder received", Message: destDirName, From: env.From, Path: destDir, Size: env.Size, Timestamp: time.Now()})
+	savedDirName := filepath.Base(destDir)
+	displayFolderMsg := destDirName
+	if savedDirName != destDirName {
+		displayFolderMsg = fmt.Sprintf("%s (saved as '%s' — a folder with this name already existed)", destDirName, savedDirName)
+	}
+	t.emit(events.Event{Type: events.FolderReceived, Title: "Folder received", Message: displayFolderMsg, From: env.From, Path: destDir, Size: env.Size, Timestamp: time.Now()})
 	localUser, _ := t.identity()
 	return t.history.AppendTransfer(env.From, localUser, destDir, env.Size, kindFolder)
 }
 
-func (t *TransferService) copyWithProgress(writer io.Writer, enc cipher.Stream, sourcePath string, total int64, ctx progressContext) error {
-	file, err := os.Open(sourcePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+func (t *TransferService) copyWithProgress(writer io.Writer, enc cipher.Stream, reader io.Reader, total int64, ctx progressContext) error {
 	chunkSize := t.chunkSize
 	if chunkSize <= 0 {
 		chunkSize = 64 * 1024
@@ -666,7 +684,7 @@ func (t *TransferService) copyWithProgress(writer io.Writer, enc cipher.Stream, 
 		if t.isStopping() {
 			return errServiceStopping
 		}
-		n, err := file.Read(buf)
+		n, err := reader.Read(buf)
 		if n > 0 {
 			payload := buf[:n]
 			if enc != nil {
@@ -826,7 +844,7 @@ func (t *TransferService) awaitInlineDeliveryAck(conn net.Conn, shared []byte, s
 	}
 	frame, err := readEnvelope(conn)
 	if err != nil {
-		return fmt.Errorf("delivery confirmation timeout for %s '%s': %w", transferKindLabel(sent.Kind), transferDisplayName(sent.Kind, sent.Name), err)
+		return fmt.Errorf("no delivery confirmation from '%s' for %s '%s' — the transfer may or may not have completed", sent.To, transferKindLabel(sent.Kind), transferDisplayName(sent.Kind, sent.Name))
 	}
 	ack, err := openEnvelope(frame, shared)
 	if err != nil {
@@ -1053,6 +1071,37 @@ func transferDisplayName(kind, name string) string {
 	return trimmed
 }
 
+// humanizeTransferError converts low-level network and OS error strings
+// into plain-language messages that make sense to a non-technical user.
+func humanizeTransferError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "connection refused"):
+		return "peer is not reachable (connection refused) — check they are running Bonjou on the same network"
+	case strings.Contains(msg, "no route to host"):
+		return "peer is not reachable — check your network connection"
+	case strings.Contains(msg, "broken pipe") || strings.Contains(msg, "use of closed network connection"):
+		return "connection was lost mid-transfer — please try again"
+	case strings.Contains(msg, "reset by peer"):
+		return "peer closed the connection unexpectedly — please try again"
+	case strings.Contains(msg, "no such file") || strings.Contains(msg, "file not found"):
+		return "file no longer exists at the specified path"
+	case strings.Contains(msg, "permission denied"):
+		return "permission denied — check file and folder permissions"
+	case strings.Contains(msg, "no delivery confirmation"),
+		strings.Contains(msg, "integrity check failed"),
+		strings.Contains(msg, "Delivery failed"):
+		return msg // already a plain-language message
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline exceeded"):
+		return "connection timed out — check the peer is still reachable"
+	default:
+		return msg
+	}
+}
+
 func (t *TransferService) emitTransferIssue(kind, name, peer, path string, err error) {
 	if err == nil {
 		return
@@ -1069,17 +1118,18 @@ func (t *TransferService) emitTransferIssue(kind, name, peer, path string, err e
 		t.emit(events.Event{
 			Type:      events.Status,
 			Title:     "Transfer cancelled",
-			Message:   fmt.Sprintf("%s transfer cancelled for %s (%s)", kind, label, who),
+			Message:   fmt.Sprintf("%s '%s' to %s was cancelled (Bonjou is shutting down)", transferKindLabel(kind), label, who),
 			From:      who,
 			Path:      path,
 			Timestamp: time.Now(),
 		})
 		return
 	}
+	reason := humanizeTransferError(err)
 	t.emit(events.Event{
 		Type:      events.Error,
 		Title:     "Transfer failed",
-		Message:   fmt.Sprintf("%s transfer failed for %s (%s): %v", kind, label, who, err),
+		Message:   fmt.Sprintf("Failed to send %s '%s' to %s: %s", transferKindLabel(kind), label, who, reason),
 		From:      who,
 		Path:      path,
 		Timestamp: time.Now(),
@@ -1371,17 +1421,44 @@ func formatRemote(name, ip string) string {
 	}
 }
 
-func fileChecksum(path string) (string, error) {
-	file, err := os.Open(path)
+// transferFile holds an open file handle together with its pre-computed
+// size and SHA-256 checksum. Because all three values come from a single
+// open(2) call, the stat/checksum/stream race — which can cause a
+// checksum mismatch when a file is modified between separate operations —
+// is eliminated.
+type transferFile struct {
+	file     *os.File
+	size     int64
+	checksum string
+}
+
+// openTransferFile opens path once, reads through it to compute its
+// SHA-256 checksum, then seeks back to the beginning so the caller can
+// stream the exact same bytes to the network.
+func openTransferFile(path string) (*transferFile, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer file.Close()
+	stat, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
 	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return "", err
+	if _, err := io.Copy(hasher, f); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("failed to read file for checksum: %w", err)
 	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("failed to seek file for streaming: %w", err)
+	}
+	return &transferFile{
+		file:     f,
+		size:     stat.Size(),
+		checksum: hex.EncodeToString(hasher.Sum(nil)),
+	}, nil
 }
 
 func uniquePath(path string) string {

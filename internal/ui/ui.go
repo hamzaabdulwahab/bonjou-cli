@@ -183,7 +183,19 @@ func (u *UI) renderEvent(evt events.Event) {
 		}
 		u.writeLine(fmt.Sprintf("%s[%s] %s sent: '%s' to %s (waiting for delivery confirmation)%s", colorMuted, ts, itemKind, safe(evt.Message), safe(evt.To), colorReset))
 	case events.Error:
-		u.writeLine(fmt.Sprintf("%s[%s] ERROR: %s%s", colorError, ts, safe(evt.Message), colorReset))
+		msg := safe(evt.Message)
+		// Avoid a redundant "ERROR: Delivery failed:" double-label by not
+		// prepending "ERROR: " when the message is already a full sentence
+		// that starts with a contextual word (capital letter followed by
+		// lowercase, not an ALL-CAPS acronym or a bare filename).
+		if strings.HasPrefix(msg, "Delivery failed:") ||
+			strings.HasPrefix(msg, "Failed to send") ||
+			strings.HasPrefix(msg, "File '") ||
+			strings.HasPrefix(msg, "Folder '") {
+			u.writeLine(fmt.Sprintf("%s[%s] ✗ %s%s", colorError, ts, msg, colorReset))
+		} else {
+			u.writeLine(fmt.Sprintf("%s[%s] ERROR: %s%s", colorError, ts, msg, colorReset))
+		}
 	case events.Status:
 		if strings.EqualFold(strings.TrimSpace(evt.Title), "Delivery confirmed") || strings.HasPrefix(strings.TrimSpace(evt.Message), "Delivered:") {
 			u.writeLine(fmt.Sprintf("%s[%s] %s%s", colorSuccess, ts, safe(evt.Message), colorReset))
