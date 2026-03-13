@@ -25,6 +25,7 @@ import (
 	"github.com/hamzawahab/bonjou-cli/internal/events"
 	"github.com/hamzawahab/bonjou-cli/internal/history"
 	"github.com/hamzawahab/bonjou-cli/internal/logger"
+	"github.com/hamzawahab/bonjou-cli/internal/queue"
 )
 
 const (
@@ -86,6 +87,7 @@ type TransferService struct {
 	history      *history.Manager
 	events       chan<- events.Event
 	discovery    *DiscoveryService
+	queue        *queue.Manager
 	listener     net.Listener
 	stop         chan struct{}
 	stopOnce     sync.Once
@@ -108,13 +110,14 @@ func (t *TransferService) isStopping() bool {
 	}
 }
 
-func NewTransferService(cfg *config.Config, logger *logger.Logger, history *history.Manager, events chan<- events.Event, discovery *DiscoveryService) *TransferService {
+func NewTransferService(cfg *config.Config, logger *logger.Logger, history *history.Manager, events chan<- events.Event, discovery *DiscoveryService, queueMgr *queue.Manager) *TransferService {
 	return &TransferService{
 		cfg:          cfg,
 		logger:       logger,
 		history:      history,
 		events:       events,
 		discovery:    discovery,
+		queue:        queueMgr,
 		stop:         make(chan struct{}),
 		chunkSize:    cfg.ChunkSizeBytes(),
 		chunkTimeout: cfg.ChunkTimeout(),
@@ -497,19 +500,23 @@ func (t *TransferService) receiveFile(conn net.Conn, env *envelope, key []byte) 
 	if t.isStopping() {
 		return errServiceStopping
 	}
-	destPath := uniquePath(filepath.Join(t.cfg.ReceivedFilesDir, env.Name))
-
+	pendingDir := filepath.Join(os.TempDir(), "bonjou-pending")
+	if err := os.MkdirAll(pendingDir, 0o755); err != nil {
+		return err
+	}
+	destPath := queue.UniquePath(filepath.Join(pendingDir, "file-"+env.Name))
+	
 	// Security: Prevent path traversal attacks
 	absDestPath, err := filepath.Abs(destPath)
 	if err != nil {
 		return fmt.Errorf("invalid path: %v", err)
 	}
-	absDirPath, err := filepath.Abs(t.cfg.ReceivedFilesDir)
+	absDirPath, err := filepath.Abs(pendingDir)
 	if err != nil {
 		return fmt.Errorf("invalid destination directory: %v", err)
 	}
 	if !strings.HasPrefix(absDestPath, absDirPath) {
-		return fmt.Errorf("path traversal not allowed: file would be written outside received directory")
+		return fmt.Errorf("path traversal not allowed: file would be written outside pending directory")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
@@ -566,21 +573,34 @@ func (t *TransferService) receiveFile(conn net.Conn, env *envelope, key []byte) 
 	if err := t.writeInlineDeliveryAck(conn, key, env, kindFile, env.Name, "ok"); err != nil {
 		t.sendDeliveryAckOutOfBand(env, kindFile, env.Name, "ok")
 	}
-	savedName := filepath.Base(destPath)
-	displayMsg := env.Name
-	if savedName != env.Name {
-		displayMsg = fmt.Sprintf("%s (saved as '%s' — a file with this name already existed)", env.Name, savedName)
-	}
-	t.emit(events.Event{Type: events.FileReceived, Title: "File received", Message: displayMsg, From: env.From, Path: destPath, Size: env.Size, Timestamp: time.Now()})
-	localUser, _ := t.identity()
-	return t.history.AppendTransfer(env.From, localUser, destPath, env.Size, kindFile)
+
+	_ = t.queue.AddFile(env.From, env.FromIP, env.Name, env.Size, destPath)
+	displayMsg := fmt.Sprintf("User %s wants to send a file: %s,%s", env.From, env.Name, formatSize(env.Size))
+	
+	t.emit(events.Event{
+		Type:      events.FilePending,
+		Title:     "File pending transfer",
+		Message:   displayMsg,
+		From:      env.From,
+		Path:      destPath,
+		Size:      env.Size,
+		Timestamp: time.Now(),
+		Level:     "info",
+	})
+	
+	// Intentionally not adding to history until approved
+	return nil
 }
 
 func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte) error {
 	if t.isStopping() {
 		return errServiceStopping
 	}
-	tempPath := uniquePath(filepath.Join(os.TempDir(), env.Name))
+	pendingDir := filepath.Join(os.TempDir(), "bonjou-pending")
+	if err := os.MkdirAll(pendingDir, 0o755); err != nil {
+		return err
+	}
+	tempPath := queue.UniquePath(filepath.Join(pendingDir, "raw-"+env.Name))
 	file, err := os.Create(tempPath)
 	if err != nil {
 		return err
@@ -592,7 +612,7 @@ func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte
 	hasher := sha256.New()
 	progressID := fmt.Sprintf("recv:%s", env.Name)
 	destDirName := strings.TrimSuffix(env.Name, ".zip")
-	displayPath := filepath.Join(t.cfg.ReceivedFoldersDir, destDirName)
+	displayPath := filepath.Join(pendingDir, destDirName)
 	ctx := progressContext{
 		id:        progressID,
 		label:     fmt.Sprintf("Receiving %s", destDirName),
@@ -626,19 +646,19 @@ func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte
 		t.emit(events.Event{Type: events.Error, Title: "Transfer integrity check failed", Message: msg, From: env.From, Timestamp: time.Now(), Path: tempPath})
 		return fmt.Errorf("transfer integrity check failed for folder '%s'", destDirName)
 	}
-	destDir := uniquePath(displayPath)
+	destDir := queue.UniquePath(displayPath)
 
 	// Security: Prevent path traversal attacks
 	absDestDir, err := filepath.Abs(destDir)
 	if err != nil {
 		return fmt.Errorf("invalid path: %v", err)
 	}
-	absFolderPath, err := filepath.Abs(t.cfg.ReceivedFoldersDir)
+	absFolderPath, err := filepath.Abs(pendingDir)
 	if err != nil {
 		return fmt.Errorf("invalid destination directory: %v", err)
 	}
 	if !strings.HasPrefix(absDestDir, absFolderPath) {
-		return fmt.Errorf("path traversal not allowed: folder would be written outside received directory")
+		return fmt.Errorf("path traversal not allowed: folder would be written outside pending directory")
 	}
 
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
@@ -654,14 +674,23 @@ func (t *TransferService) receiveFolder(conn net.Conn, env *envelope, key []byte
 	if err := t.writeInlineDeliveryAck(conn, key, env, kindFolder, destDirName, "ok"); err != nil {
 		t.sendDeliveryAckOutOfBand(env, kindFolder, destDirName, "ok")
 	}
-	savedDirName := filepath.Base(destDir)
-	displayFolderMsg := destDirName
-	if savedDirName != destDirName {
-		displayFolderMsg = fmt.Sprintf("%s (saved as '%s' — a folder with this name already existed)", destDirName, savedDirName)
-	}
-	t.emit(events.Event{Type: events.FolderReceived, Title: "Folder received", Message: displayFolderMsg, From: env.From, Path: destDir, Size: env.Size, Timestamp: time.Now()})
-	localUser, _ := t.identity()
-	return t.history.AppendTransfer(env.From, localUser, destDir, env.Size, kindFolder)
+
+	_ = t.queue.AddFolder(env.From, env.FromIP, destDirName, env.Size, destDir)
+	displayFolderMsg := fmt.Sprintf("User %s wants to send a folder: %s,%s", env.From, destDirName, formatSize(env.Size))
+	
+	t.emit(events.Event{
+		Type:      events.FolderPending,
+		Title:     "Folder pending transfer",
+		Message:   displayFolderMsg,
+		From:      env.From,
+		Path:      destDir,
+		Size:      env.Size,
+		Timestamp: time.Now(),
+		Level:     "info",
+	})
+	
+	// Intentionally not adding to history until approved
+	return nil
 }
 
 func (t *TransferService) copyWithProgress(writer io.Writer, enc cipher.Stream, reader io.Reader, total int64, ctx progressContext) error {
@@ -1563,9 +1592,19 @@ func unzip(zipPath, dest string) error {
 			return err
 		}
 		src.Close()
-		if err := dst.Close(); err != nil {
-			return err
-		}
 	}
 	return nil
+}
+
+func formatSize(size int64) string {
+	const unit = 1000
+	if size < unit {
+		return fmt.Sprintf("%d B", size)
+	}
+	div, exp := int64(unit), 0
+	for n := size / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }

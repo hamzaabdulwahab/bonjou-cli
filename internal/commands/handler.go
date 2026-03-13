@@ -75,6 +75,28 @@ func (h *Handler) Handle(input string) (Result, error) {
 		return h.cmdClear(args)
 	case "exit":
 		return Result{Quit: true}, nil
+	case "fileQueue":
+		return h.cmdFileQueue()
+	case "approveFile":
+		return h.cmdApproveFile(args)
+	case "rejectFile":
+		return h.cmdRejectFile(args)
+	case "approveFileQueue":
+		return h.cmdApproveFileQueue()
+	case "rejectFileQueue":
+		return h.cmdRejectFileQueue()
+	case "folderQueue":
+		return h.cmdFolderQueue()
+	case "approveFolder":
+		return h.cmdApproveFolder(args)
+	case "rejectFolder":
+		return h.cmdRejectFolder(args)
+	case "approveFolderQueue":
+		return h.cmdApproveFolderQueue()
+	case "rejectFolderQueue":
+		return h.cmdRejectFolderQueue()
+	case "viewFolder":
+		return h.cmdViewFolder(args)
 	default:
 		return Result{}, ErrUnknownCommand
 	}

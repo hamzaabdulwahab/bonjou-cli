@@ -188,6 +188,9 @@ func (u *UI) renderEvent(evt events.Event) {
 			itemKind = "Folder"
 		}
 		u.writeLine(fmt.Sprintf("%s[%s] %s received: '%s' from %s -> %s%s", colorPrimary, ts, itemKind, safe(evt.Message), safe(evt.From), evt.Path, colorReset))
+	case events.FilePending, events.FolderPending:
+		// The prompt specifies: "User1 wants to send a file... " The Message already contains the formatted string.
+		u.writeLine(fmt.Sprintf("%s[%s]%s %s", colorAccent, ts, colorReset, evt.Message))
 	case events.FileSent, events.FolderSent:
 		itemKind := "File"
 		if evt.Type == events.FolderSent {
