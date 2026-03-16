@@ -166,7 +166,7 @@ func (h *Handler) cmdFile(parts []string, args string) (Result, error) {
 		return Result{}, err
 	}
 	if err := h.session.Transfer.SendFile(peer, path); err != nil {
-		return Result{}, err
+		return Result{}, nil
 	}
 	return Result{}, nil
 }
@@ -195,7 +195,7 @@ func (h *Handler) cmdFolder(parts []string, args string) (Result, error) {
 		return Result{}, err
 	}
 	if err := h.session.Transfer.SendFolder(peer, path); err != nil {
-		return Result{}, err
+		return Result{}, nil
 	}
 	return Result{}, nil
 }
@@ -440,102 +440,17 @@ func (h *Handler) cmdWizard() (Result, error) {
 	}
 
 	selectedIP := ""
-	action := ""
-	message := ""
-	targetPath := ""
-	confirmed := false
 
 	if err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Choose recipient").
-				Description("Pick one discovered Bonjou peer").
+				Description("Pick one discovered Bonjou peer. Press Ctrl+C anytime to exit wizard mode.").
 				Options(peerOptions...).
 				Value(&selectedIP),
 		),
 	).Run(); err != nil {
-		return Result{Output: "Wizard cancelled."}, nil
-	}
-
-	if err := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("What do you want to send?").
-				Options(
-					huh.NewOption("Message", "message"),
-					huh.NewOption("File", "file"),
-					huh.NewOption("Folder", "folder"),
-				).
-				Value(&action),
-		),
-	).Run(); err != nil {
-		return Result{Output: "Wizard cancelled."}, nil
-	}
-
-	if action == "message" {
-		if err := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Message").
-					Placeholder("Type your message").
-					Validate(func(value string) error {
-						if strings.TrimSpace(value) == "" {
-							return errors.New("message cannot be empty")
-						}
-						return nil
-					}).
-					Value(&message),
-			),
-		).Run(); err != nil {
-			return Result{Output: "Wizard cancelled."}, nil
-		}
-	} else {
-		pathTitle := "File path"
-		if action == "folder" {
-			pathTitle = "Folder path"
-		}
-		if err := huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title(pathTitle).
-					Placeholder("~/Downloads/example.txt").
-					Validate(func(value string) error {
-						normalized, err := normalizePathArg(value)
-						if err != nil {
-							return err
-						}
-						info, err := os.Stat(normalized)
-						if err != nil {
-							return err
-						}
-						if action == "file" && info.IsDir() {
-							return errors.New("selected path is a directory")
-						}
-						if action == "folder" && !info.IsDir() {
-							return errors.New("selected path is not a directory")
-						}
-						return nil
-					}).
-					Value(&targetPath),
-			),
-		).Run(); err != nil {
-			return Result{Output: "Wizard cancelled."}, nil
-		}
-	}
-
-	if err := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Send now?").
-				Affirmative("Send").
-				Negative("Cancel").
-				Value(&confirmed),
-		),
-	).Run(); err != nil {
-		return Result{Output: "Wizard cancelled."}, nil
-	}
-	if !confirmed {
-		return Result{Output: "Wizard cancelled. Nothing was sent."}, nil
+		return Result{Output: "Wizard cancelled. Returned to command prompt."}, nil
 	}
 
 	peer, err := h.resolvePeer(selectedIP)
@@ -543,32 +458,120 @@ func (h *Handler) cmdWizard() (Result, error) {
 		return Result{}, err
 	}
 
-	switch action {
-	case "message":
-		if err := h.session.Transfer.SendMessage(peer, message); err != nil {
-			return Result{}, err
+	for {
+		action := ""
+		message := ""
+		targetPath := ""
+		confirmed := false
+
+		if err := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("What do you want to send?").
+					Options(
+						huh.NewOption("Message", "message"),
+						huh.NewOption("File", "file"),
+						huh.NewOption("Folder", "folder"),
+					).
+					Value(&action),
+			),
+		).Run(); err != nil {
+			return Result{Output: "Wizard cancelled. Returned to command prompt."}, nil
 		}
-		return Result{Output: fmt.Sprintf("Sent message to %s", peerLabel(peer))}, nil
-	case "file":
-		path, err := normalizePathArg(targetPath)
-		if err != nil {
-			return Result{}, err
+
+		if action == "message" {
+			if err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewInput().
+						Title("Message").
+						Placeholder("Type your message").
+						Validate(func(value string) error {
+							if strings.TrimSpace(value) == "" {
+								return errors.New("message cannot be empty")
+							}
+							return nil
+						}).
+						Value(&message),
+				),
+			).Run(); err != nil {
+				return Result{Output: "Wizard cancelled. Returned to command prompt."}, nil
+			}
+		} else {
+			pathTitle := "File path"
+			if action == "folder" {
+				pathTitle = "Folder path"
+			}
+			if err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewInput().
+						Title(pathTitle).
+						Placeholder("~/Downloads/example.txt").
+						Validate(func(value string) error {
+							normalized, err := normalizePathArg(value)
+							if err != nil {
+								return err
+							}
+							info, err := os.Stat(normalized)
+							if err != nil {
+								return err
+							}
+							if action == "file" && info.IsDir() {
+								return errors.New("selected path is a directory")
+							}
+							if action == "folder" && !info.IsDir() {
+								return errors.New("selected path is not a directory")
+							}
+							return nil
+						}).
+						Value(&targetPath),
+				),
+			).Run(); err != nil {
+				return Result{Output: "Wizard cancelled. Returned to command prompt."}, nil
+			}
 		}
-		if err := h.session.Transfer.SendFile(peer, path); err != nil {
-			return Result{}, err
+
+		if err := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Send now?").
+					Affirmative("Send").
+					Negative("Cancel").
+					Value(&confirmed),
+			),
+		).Run(); err != nil {
+			return Result{Output: "Wizard cancelled. Returned to command prompt."}, nil
 		}
-		return Result{}, nil
-	case "folder":
-		path, err := normalizePathArg(targetPath)
-		if err != nil {
-			return Result{}, err
+		if !confirmed {
+			continue
 		}
-		if err := h.session.Transfer.SendFolder(peer, path); err != nil {
-			return Result{}, err
+
+		switch action {
+		case "message":
+			if err := h.session.Transfer.SendMessage(peer, message); err != nil {
+				return Result{}, err
+			}
+			return Result{Output: fmt.Sprintf("Sent message to %s", peerLabel(peer))}, nil
+		case "file":
+			path, err := normalizePathArg(targetPath)
+			if err != nil {
+				return Result{}, err
+			}
+			if err := h.session.Transfer.SendFile(peer, path); err != nil {
+				return Result{}, err
+			}
+			return Result{}, nil
+		case "folder":
+			path, err := normalizePathArg(targetPath)
+			if err != nil {
+				return Result{}, err
+			}
+			if err := h.session.Transfer.SendFolder(peer, path); err != nil {
+				return Result{}, err
+			}
+			return Result{}, nil
+		default:
+			return Result{}, fmt.Errorf("unsupported wizard action: %s", action)
 		}
-		return Result{}, nil
-	default:
-		return Result{}, fmt.Errorf("unsupported wizard action: %s", action)
 	}
 }
 

@@ -46,6 +46,8 @@ You can use their username or IP address.
 @wizard
 ```
 
+To exit wizard mode at any step, press `Ctrl+C`. You return to the normal command prompt and nothing is sent unless you confirm.
+
 ## Sending Files
 
 **Send a file:**
@@ -76,6 +78,19 @@ You can use their username or IP address.
 Files are received in:
 - `~/.bonjou/received/files/`
 - `~/.bonjou/received/folders/`
+
+## Transfer Status
+
+Bonjou uses clear end-state transfer messages:
+
+- Upload progress line while bytes are being sent
+	- Example: `✓ Sent 🗂️ Folder → abd@192.168.1.3:46321 ... 100%`
+- Final success confirmation
+	- Example: `Delivered: Folder 'Books' to abd`
+- Final failure confirmation
+	- Example: `Failed to send Folder 'Books' to abd: receiver did not confirm the transfer in time ...`
+
+Treat `Delivered: ...` as the definitive success signal.
 
 ## Discovery Limits
 
