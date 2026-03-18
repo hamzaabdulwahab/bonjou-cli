@@ -61,4 +61,10 @@ mkdir -p "$DIST_DIR/homebrew" "$DIST_DIR/scoop"
 cp "$ROOT_DIR/packaging/homebrew/bonjou.rb" "$DIST_DIR/homebrew/bonjou.rb"
 cp "$ROOT_DIR/packaging/scoop/bonjou.json" "$DIST_DIR/scoop/bonjou.json"
 
+mkdir -p "$DIST_DIR/aur" "$DIST_DIR/chocolatey/tools"
+cp "$ROOT_DIR/packaging/aur/PKGBUILD" "$DIST_DIR/aur/PKGBUILD"
+cp "$ROOT_DIR/packaging/chocolatey/bonjou.nuspec" "$DIST_DIR/chocolatey/bonjou.nuspec"
+cp "$ROOT_DIR/packaging/chocolatey/tools/chocolateyinstall.ps1" "$DIST_DIR/chocolatey/tools/chocolateyinstall.ps1"
+cp "$ROOT_DIR/packaging/chocolatey/tools/chocolateyuninstall.ps1" "$DIST_DIR/chocolatey/tools/chocolateyuninstall.ps1"
+
 echo "Packaging complete."

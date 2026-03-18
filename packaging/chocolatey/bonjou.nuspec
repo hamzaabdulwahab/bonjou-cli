@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>bonjou</id>
+    <version>1.1.0</version>
+    <title>Bonjou</title>
+    <authors>Hamza Abdul Wahab</authors>
+    <projectUrl>https://github.com/hamzaabdulwahab/bonjou-cli</projectUrl>
+    <licenseUrl>https://github.com/hamzaabdulwahab/bonjou-cli/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Bonjou is a terminal-based LAN chat and file transfer tool for local networks.</description>
+    <releaseNotes>https://github.com/hamzaabdulwahab/bonjou-cli/releases/tag/v1.1.0</releaseNotes>
+    <copyright>2026 Hamza Abdul Wahab</copyright>
+    <tags>bonjou cli terminal lan chat file-transfer</tags>
+    <packageSourceUrl>https://github.com/hamzaabdulwahab/bonjou-cli/tree/main/packaging/chocolatey</packageSourceUrl>
+    <docsUrl>https://github.com/hamzaabdulwahab/bonjou-cli/blob/main/docs/install-guide.md</docsUrl>
+    <bugTrackerUrl>https://github.com/hamzaabdulwahab/bonjou-cli/issues</bugTrackerUrl>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

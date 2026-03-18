@@ -60,6 +60,11 @@ winget install HamzaAbdulWahab.Bonjou
 scoop install https://raw.githubusercontent.com/hamzaabdulwahab/scoop-bonjou/main/bonjou.json
 ```
 
+**Windows (Chocolatey):**
+```powershell
+choco install bonjou
+```
+
 If you prefer the classic two-step flow:
 ```powershell
 scoop bucket add bonjou https://github.com/hamzaabdulwahab/scoop-bonjou
@@ -75,6 +80,11 @@ sudo dpkg -i bonjou_1.1.0_amd64.deb
 # For ARM64 (Mac with Docker/Parallels, Raspberry Pi)
 wget https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.1.0/bonjou_1.1.0_arm64.deb
 sudo dpkg -i bonjou_1.1.0_arm64.deb
+```
+
+**Linux (Arch/AUR):**
+```bash
+yay -S bonjou-bin
 ```
 
 Or download from [Releases](https://github.com/hamzaabdulwahab/bonjou-cli/releases).

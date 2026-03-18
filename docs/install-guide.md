@@ -73,6 +73,21 @@ go build -o bonjou ./cmd/bonjou
 sudo mv bonjou /usr/local/bin/
 ```
 
+### Option 4: Arch Linux (AUR)
+
+If you use Arch Linux or an Arch-based distro:
+
+```bash
+yay -S bonjou-bin
+```
+
+Or manually from AUR:
+```bash
+git clone https://aur.archlinux.org/bonjou-bin.git
+cd bonjou-bin
+makepkg -si
+```
+
 ---
 
 ## Linux
@@ -185,13 +200,36 @@ Update later:
 scoop update bonjou
 ```
 
+### Option 3: Chocolatey
+
+If you have [Chocolatey](https://community.chocolatey.org/) installed:
+
+```powershell
+choco install bonjou
+```
+
+Run:
+```powershell
+bonjou
+```
+
+Update later:
+```powershell
+choco upgrade bonjou
+```
+
+Uninstall:
+```powershell
+choco uninstall bonjou
+```
+
 If download fails, clear cache first:
 ```powershell
 scoop cache rm bonjou
 scoop install bonjou
 ```
 
-### Option 3: Download manually
+### Option 4: Download manually
 
 1. Download from releases:
 ```powershell
@@ -212,7 +250,7 @@ Expand-Archive bonjou-windows.zip -DestinationPath C:\Tools\Bonjou
 bonjou
 ```
 
-### Option 4: Build from source
+### Option 5: Build from source
 
 ```powershell
 git clone https://github.com/hamzaabdulwahab/bonjou-cli.git
