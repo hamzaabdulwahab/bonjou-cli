@@ -39,6 +39,18 @@ brew install bonjou
 ```
 
 **Windows (WinGet — pre-installed on Windows 10/11):**
+
+First, update the WinGet package source index:
+```powershell
+winget source update
+```
+
+Then install using the explicit package ID:
+```powershell
+winget install --id HamzaAbdulWahab.Bonjou --exact
+```
+
+Or use the simpler form (if available in your index):
 ```powershell
 winget install HamzaAbdulWahab.Bonjou
 ```

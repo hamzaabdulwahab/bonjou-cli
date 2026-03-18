@@ -134,8 +134,14 @@ sudo mv bonjou /usr/local/bin/
 
 WinGet ships with every modern Windows installation. Open PowerShell or Command Prompt:
 
+First, update the WinGet package source index:
 ```powershell
-winget install HamzaAbdulWahab.Bonjou
+winget source update
+```
+
+Then install using the explicit package ID:
+```powershell
+winget install --id HamzaAbdulWahab.Bonjou --exact
 ```
 
 Run:
@@ -145,12 +151,12 @@ bonjou
 
 Update later:
 ```powershell
-winget upgrade HamzaAbdulWahab.Bonjou
+winget upgrade --id HamzaAbdulWahab.Bonjou --exact
 ```
 
 Uninstall:
 ```powershell
-winget uninstall HamzaAbdulWahab.Bonjou
+winget uninstall --id HamzaAbdulWahab.Bonjou --exact
 ```
 
 > **Note:** The package must be published in the [winget-pkgs community repository](https://github.com/microsoft/winget-pkgs) for this to work.

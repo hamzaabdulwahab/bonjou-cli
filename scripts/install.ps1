@@ -52,7 +52,10 @@ function Install-Direct {
 
 if (Get-Command winget -ErrorAction SilentlyContinue) {
     Write-Info 'WinGet found. Installing via WinGet...'
-    winget install $WinGetId --silent --accept-package-agreements --accept-source-agreements
+    Write-Info 'Updating WinGet source index...'
+    winget source update
+    Write-Info 'Installing Bonjou...'
+    winget install --id $WinGetId --exact --silent --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -eq 0) {
         Write-Info 'Installed successfully via WinGet.'
         exit 0
