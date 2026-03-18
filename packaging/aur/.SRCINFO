@@ -1,0 +1,13 @@
+pkgbase = bonjou-bin
+	pkgdesc = Terminal-based LAN chat and file transfer for local networks
+	pkgver = 1.1.0
+	pkgrel = 1
+	url = https://github.com/hamzaabdulwahab/bonjou-cli
+	arch = x86_64
+	license = MIT
+	provides = bonjou
+	conflicts = bonjou
+	source = https://github.com/hamzaabdulwahab/bonjou-cli/releases/download/v1.1.0/bonjou-linux-amd64
+	sha256sums = 88c0b048dc9b6b17f77263b03968f41ab1f822498071e8bb6226055beb790c86
+
+pkgname = bonjou-bin

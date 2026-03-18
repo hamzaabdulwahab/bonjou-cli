@@ -43,21 +43,45 @@ This guide tracks where Bonjou is published and how to submit/update each packag
 ## AUR (Arch)
 
 - Update `packaging/aur/PKGBUILD` (`pkgver`, `sha256sums`).
+- Keep `packaging/aur/.SRCINFO` in sync with `PKGBUILD`.
 - Publish to AUR repo for `bonjou-bin`.
-- Typical flow:
-  - `makepkg --printsrcinfo > .SRCINFO`
-  - `git add PKGBUILD .SRCINFO`
-  - `git commit -m "bonjou-bin: update to vX.Y.Z"`
-  - `git push`
+- Prerequisites:
+  - AUR account with your SSH public key added.
+  - Working SSH auth to `aur@aur.archlinux.org`.
+- Automated flow:
+  - `./scripts/publish-aur.sh`
 
 ## Chocolatey
 
 - Update these files:
   - `packaging/chocolatey/bonjou.nuspec`
   - `packaging/chocolatey/tools/chocolateyinstall.ps1`
-- Build and push package:
-  - `choco pack packaging/chocolatey/bonjou.nuspec`
-  - `choco push bonjou.X.Y.Z.nupkg --source https://push.chocolatey.org/`
+- Prerequisites:
+  - Chocolatey CLI installed on Windows.
+  - `CHOCO_API_KEY` environment variable set.
+- Automated flow:
+  - `pwsh ./scripts/publish-chocolatey.ps1`
+
+## One-time Tooling Notes
+
+- AUR publish can be initiated from macOS/Linux once SSH key access is configured.
+- Chocolatey publishing must run in a Windows environment with `choco` available.
+
+## GitHub Actions (Publish Both Together)
+
+Use workflow: `.github/workflows/publish-aur-and-choco.yml`
+
+Required repository secrets:
+
+- `AUR_SSH_PRIVATE_KEY`: private SSH key for your AUR account.
+- `AUR_GIT_NAME`: commit author name for AUR commits.
+- `AUR_GIT_EMAIL`: commit author email for AUR commits.
+- `CHOCO_API_KEY`: Chocolatey push API key.
+
+You can also run channel-specific workflows:
+
+- `.github/workflows/publish-aur.yml`
+- `.github/workflows/publish-chocolatey.yml`
 
 ## Build Helpers
 
