@@ -1,54 +1,54 @@
 /*
- * Bonjou web: compact local-network instrument.
- * Brand colors are translated into OKLCH tokens: dark charcoal, warm paper,
- * orange command accent, blue network signal, green approval state.
+ * Bonjou web: light product marketing system.
+ * Beam-inspired structure, Bonjou-owned palette: white surfaces, deep navy,
+ * blue command accent, green approval state, dark terminal product surfaces.
  */
 
 :root {
   /* Typography */
-  --font-display: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --font-size: 16px;
 
   /* Surfaces */
-  --bg: oklch(15.8% 0.012 85);
-  --bg-soft: oklch(18.2% 0.014 85);
-  --surface-1: oklch(20.5% 0.014 85);
-  --surface-2: oklch(24.5% 0.016 85);
-  --surface-3: oklch(30% 0.018 85);
-  --paper: oklch(96.8% 0.012 92);
+  --bg: oklch(99.2% 0.003 250);
+  --bg-soft: oklch(96.7% 0.010 250);
+  --surface-1: oklch(100% 0 0);
+  --surface-2: oklch(97.5% 0.008 250);
+  --surface-3: oklch(93.8% 0.012 250);
+  --paper: oklch(100% 0 0);
 
   /* Lines */
-  --border: oklch(31% 0.018 85);
-  --border-strong: oklch(43% 0.022 85);
+  --border: oklch(89.8% 0.014 250);
+  --border-strong: oklch(78.5% 0.026 250);
 
   /* Text */
-  --text: oklch(96.5% 0.012 92);
-  --text-muted: oklch(77% 0.018 92);
-  --text-dim: oklch(61% 0.020 92);
+  --text: oklch(16.2% 0.037 255);
+  --text-muted: oklch(39% 0.036 255);
+  --text-dim: oklch(59% 0.026 255);
 
   /* Brand accents */
-  --accent: oklch(67% 0.135 42);
-  --accent-strong: oklch(72% 0.145 42);
-  --accent-soft: oklch(67% 0.135 42 / 0.14);
-  --accent-contrast: oklch(18% 0.018 70);
+  --accent: oklch(56% 0.215 260);
+  --accent-strong: oklch(48% 0.225 260);
+  --accent-soft: oklch(56% 0.215 260 / 0.11);
+  --accent-contrast: oklch(100% 0 0);
 
-  --signal: oklch(68% 0.095 250);
-  --signal-soft: oklch(68% 0.095 250 / 0.16);
-  --approve: oklch(62% 0.090 125);
+  --signal: oklch(58% 0.170 245);
+  --signal-soft: oklch(58% 0.170 245 / 0.12);
+  --approve: oklch(62% 0.145 145);
 
   /* Subnet-viz ghost */
-  --ghost: oklch(67% 0.070 250);
-  --ghost-dim: oklch(52% 0.055 250);
+  --ghost: oklch(70% 0.085 250);
+  --ghost-dim: oklch(54% 0.055 250);
 
   /* Semantic */
-  --warn: oklch(80% 0.10 75);
-  --danger: oklch(65% 0.15 25);
+  --warn: oklch(76% 0.150 78);
+  --danger: oklch(63% 0.195 25);
 
   /* Ring */
-  --ring: oklch(67% 0.135 42 / 0.5);
+  --ring: oklch(56% 0.215 260 / 0.35);
 
   /* Radii */
   --radius-sm: 4px;
@@ -98,7 +98,7 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     background: var(--bg);
-    color-scheme: dark;
+    color-scheme: light;
     overflow-x: clip;
   }
 
@@ -108,7 +108,7 @@
     color: var(--text);
     min-width: 320px;
     overflow-x: clip;
-    font-feature-settings: 'ss01';
+    font-feature-settings: 'ss01', 'cv05', 'cv11';
   }
 
   #root {

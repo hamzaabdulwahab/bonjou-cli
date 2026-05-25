@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "./ui";
 
 /**
@@ -81,6 +81,20 @@ export function TypingTerminal({
     ? { visibleLineIdx: lines.length, partial: "", progressFrame: PROGRESS_FRAMES.length - 1 }
     : getPlayback(elapsed, lines, charDelay, lineDelay);
 
+  const terminalVars = {
+    "--text": "oklch(96.5% 0.012 92)",
+    "--text-muted": "oklch(76% 0.018 92)",
+    "--text-dim": "oklch(59% 0.020 92)",
+    "--accent": "oklch(70% 0.175 46)",
+    "--ghost": "oklch(72% 0.095 250)",
+    "--border": "oklch(26% 0.018 85)",
+    "--border-strong": "oklch(36% 0.022 85)",
+    "--surface-3": "oklch(32% 0.018 85)",
+    "--danger": "oklch(65% 0.15 25)",
+    "--warn": "oklch(80% 0.10 75)",
+    "--approve": "oklch(66% 0.115 135)",
+  } as CSSProperties;
+
   return (
     <div
       className={cn(
@@ -88,6 +102,7 @@ export function TypingTerminal({
         "shadow-[0_36px_100px_-64px_oklch(0%_0_0/0.8),0_1px_0_oklch(96%_0.012_92/0.045)_inset]",
         className
       )}
+      style={terminalVars}
     >
       {/* chrome */}
       <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[oklch(9.5%_0.010_85)] px-4 py-2.5">

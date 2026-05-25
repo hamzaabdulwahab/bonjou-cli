@@ -105,10 +105,10 @@ export function RepoStats({ className }: { className?: string }) {
         href={`https://github.com/${REPO}/stargazers`}
         target="_blank"
         rel="noopener noreferrer"
-        className="group inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-1)] px-2.5 font-mono text-[12px] transition-colors hover:border-[var(--border-strong)]"
+        className="group inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-1)] px-2.5 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors hover:border-[var(--border-strong)]"
         aria-label="Star Bonjou on GitHub"
       >
-        <Star className="text-[var(--accent)]" />
+        <span className="text-[var(--text-dim)]">stars</span>
         <span className={cn("tabular-nums", loaded ? "text-[var(--text)]" : "text-[var(--text-dim)]")}>
           {loaded ? formatStars(data?.stars ?? null) : <Shimmer w={20} />}
         </span>
@@ -117,10 +117,10 @@ export function RepoStats({ className }: { className?: string }) {
         href={`https://github.com/${REPO}/releases/latest`}
         target="_blank"
         rel="noopener noreferrer"
-        className="group inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-1)] px-2.5 font-mono text-[12px] transition-colors hover:border-[var(--border-strong)]"
+        className="group inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-1)] px-2.5 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors hover:border-[var(--border-strong)]"
         aria-label="Latest Bonjou release on GitHub"
       >
-        <Tag className="text-[var(--text-dim)]" />
+        <span className="text-[var(--text-dim)]">release</span>
         <span className={cn("tabular-nums", loaded ? "text-[var(--text)]" : "text-[var(--text-dim)]")}>
           {loaded ? data?.release ?? "v1.2.0" : <Shimmer w={36} />}
         </span>
@@ -136,22 +136,5 @@ function Shimmer({ w }: { w: number }) {
       className="inline-block h-[10px] animate-pulse rounded bg-[var(--surface-2)]"
       style={{ width: w }}
     />
-  );
-}
-
-function Star({ className }: { className?: string }) {
-  return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
-      <path d="M12 2.5l2.97 6.02 6.65.97-4.81 4.69 1.14 6.62L12 17.77l-5.95 3.03 1.14-6.62-4.81-4.69 6.65-.97L12 2.5z" />
-    </svg>
-  );
-}
-
-function Tag({ className }: { className?: string }) {
-  return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
-      <path d="M20.59 13.41L13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-      <circle cx="7.5" cy="7.5" r="1.5" />
-    </svg>
   );
 }

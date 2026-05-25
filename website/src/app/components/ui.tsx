@@ -190,14 +190,10 @@ export function CopyCommand({
   const [ripple, setRipple] = useState(0);
 
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setRipple((r) => r + 1);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* ignore */
-    }
+    await copyText(command);
+    setCopied(true);
+    setRipple((r) => r + 1);
+    setTimeout(() => setCopied(false), 1600);
   };
 
   return (
@@ -231,24 +227,17 @@ export function CopyCommand({
         <code className="min-w-0 truncate font-mono text-[12px] text-[var(--text)] sm:text-[13.5px]">{command}</code>
       </span>
 
-      <span className="relative flex shrink-0 items-center gap-2 font-mono text-[11px] sm:text-[12px]">
+      <span className="relative z-10 shrink-0">
         <span
           className={cn(
-            "transition-opacity duration-200",
-            copied ? "opacity-0" : "opacity-100 text-[var(--text-dim)] group-hover:text-[var(--text-muted)]"
+            "inline-flex h-7 w-[4.75rem] items-center justify-center rounded-[var(--radius-sm)] border font-mono text-[11px] uppercase tracking-[0.08em] transition-colors duration-200",
+            copied
+              ? "border-[color-mix(in_oklab,var(--accent)_45%,var(--border))] bg-[var(--accent-soft)] text-[var(--accent)]"
+              : "border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text-dim)] group-hover:text-[var(--text)]"
           )}
         >
-          copy
+          {copied ? "copied" : "copy"}
         </span>
-        <span
-          className={cn(
-            "absolute right-0 transition-opacity duration-200",
-            copied ? "opacity-100 text-[var(--accent)]" : "opacity-0"
-          )}
-        >
-          copied
-        </span>
-        <CopyIcon className={cn("text-[var(--text-dim)] transition-colors group-hover:text-[var(--text)]")} />
       </span>
 
       <style>{`@keyframes ripple {
@@ -273,13 +262,9 @@ export function InlineCommand({
   const [copied, setCopied] = useState(false);
 
   const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore */
-    }
+    await copyText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
 
   return (
@@ -289,36 +274,39 @@ export function InlineCommand({
         <code className="min-w-0 truncate font-mono text-[12px] text-[var(--text)] sm:text-[13px]">{command}</code>
       </div>
       <button
+        type="button"
         onClick={onCopy}
         className={cn(
-          "shrink-0 rounded-md p-1.5 transition-all",
-          "text-[var(--text-dim)] opacity-0 hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:opacity-100 group-hover:opacity-100",
-          copied && "opacity-100 text-[var(--accent)]"
+          "shrink-0 rounded-[var(--radius-sm)] border px-2.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] transition-colors",
+          copied
+            ? "border-[color-mix(in_oklab,var(--accent)_45%,var(--border))] bg-[var(--accent-soft)] text-[var(--accent)]"
+            : "border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text-dim)] hover:text-[var(--text)]"
         )}
         aria-label={label ? `Copy ${label}` : "Copy command"}
       >
-        {copied ? <CheckIcon /> : <CopyIcon />}
+        {copied ? "copied" : "copy"}
       </button>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
-export function CopyIcon({ className }: { className?: string }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
-
-export function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  );
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
 }
