@@ -1,0 +1,111 @@
+Design a polished, production-quality single-page marketing website for
+  Bonjou — an open-source terminal (CLI) app for local-network chat and
+  file transfer.
+
+  PRODUCT
+  Bonjou lets people on the same Wi-Fi or LAN chat and send files and
+  folders directly between their machines — no accounts, no cloud, no
+  central server, no internet required. It auto-discovers nearby peers
+  over UDP broadcast and transfers data over TCP. Transfers are
+  metadata-first: the receiver sees exactly what is being sent and must
+  explicitly approve it before any bytes are written to disk. Bonjou is
+  written in Go, MIT-licensed, cross-platform (macOS, Linux, Windows),
+  and runs entirely in the terminal with a fast @-command interface plus
+  an optional guided wizard. Current version 1.2.0.
+
+  AUDIENCE
+  Developers, technical teams, students and instructors, hackathon and
+  workshop participants — terminal-comfortable people who need to move
+  messages and files across a room without cloud tools.
+
+  FORMAT
+  One long-scroll landing page, fully responsive for desktop and mobile.
+
+  SECTIONS, IN ORDER
+  1. Sticky header — "Bonjou" logo and wordmark; nav links Features,
+     Install, Commands, Security, Docs, GitHub; a GitHub link and a
+     primary "Install" button.
+  2. Hero — headline "Local network chat and file transfer, straight
+     from the terminal." Sub-text: discovers nearby peers on the same
+     Wi-Fi/LAN, sends messages, transfers files and folders after
+     receiver approval, no accounts or servers. Buttons: "Install now"
+     (primary) and "View source." Small badges: v1.2.0, MIT, Go 1.25.
+     Product visual: a realistic terminal window showing example
+     commands and outputs (install command, launching bonjou, "@users",
+     "@file alex ~/report.pdf").
+  3. Spec strip — four compact facts in a row: "Same-subnet discovery /
+     UDP 46320", "Peer transfers / TCP 46321", "Approval queue /
+     metadata first", "Protocol v2 / AES-256-GCM".
+  4. Install — a panel with OS tabs (macOS / Linux / Windows). Each tab
+     lists install options (one-line installer, Homebrew/WinGet/Scoop,
+     direct binary) as rows, each with a command in a code block and a
+     copy button.
+  5. Demo — a terminal panel showing a realistic two-person workflow
+     (discover peers, send a message, offer a file, receiver approves)
+     next to a recorded product demo image.
+  6. Features — six features as a clean divided list, NOT a grid of
+     identical boxes: automatic peer discovery, direct/group/broadcast
+     messaging, file and folder transfer, metadata-first approvals,
+     encrypted protocol v2, command mode plus guided wizard. Each has a
+     short monospace tag, a title, and one line of detail.
+  7. Why Bonjou — a comparison table: Bonjou vs cloud drives,
+     AirDrop-style sharing, chat apps, and manual servers; each row
+     shows the alternative's tradeoff and Bonjou's stance.
+  8. Commands — a searchable command reference; every command starts
+     with "@" (@users, @send, @file, @folder, @queue, @approve, @reject,
+     @broadcast, @wizard, @trust, @setpath). Grouped into Communication,
+     File Transfers, and Trust & Settings, with a search field on top.
+  9. Security & architecture — a flow diagram: Terminal -> UDP discovery
+     (46320) -> Peer list -> TCP transfer (46321) -> Approval queue.
+     Plus security points (local-network design, explicit receive
+     control, documented AES-256-GCM encryption) and an honest
+     "current limitations" note.
+  10. Use cases — six, as a numbered list: classrooms and labs;
+      hackathons and workshops; local dev teams; offline environments;
+      Raspberry Pi and test networks; cross-platform rooms.
+  11. Open source — MIT-licensed Go project; repo facts; a
+      clone-and-run command block.
+  12. FAQ — seven questions: needs internet? needs accounts or a
+      server? supported platforms? can it send folders? where are files
+      stored? works across VLANs? is it encrypted?
+  13. Final CTA and footer — a closing "install" call to action; footer
+      with GitHub, Docs, Releases, License links.
+
+  VISUAL STYLE
+  A premium, modern dark developer-tool aesthetic — confident, precise,
+  and technical, in the spirit of Linear, Vercel, Warp, and Raycast.
+  Near-black background with subtle depth: soft ambient lighting, gentle
+  shadows, layered surfaces, not flat. A single accent color: cyan
+  (#18d9ff), used deliberately for primary actions, links, the terminal
+  cursor, and key highlights. A clean characterful sans-serif for
+  headings and UI; a monospace typeface for all code, commands, terminal
+  output, and small technical labels. Strong typographic hierarchy with
+  a large confident hero headline. Treat terminal windows as polished
+  hero product visuals. Generous, varied spacing. Subtle smooth
+  micro-interactions. Overall feeling: a precise, trustworthy instrument
+  — quietly premium, never flashy or generic.
+
+  AVOID
+  Generic AI-landing-page clichés; fake testimonials, customer logos, or
+  invented metrics; an oversized empty hero; walls of identical icon
+  cards; purple-gradient-on-white.
+
+  Want a different look?
+
+  Replace the VISUAL STYLE paragraph with one of these:
+
+  VISUAL STYLE — light editorial
+  A clean, light, editorial technical aesthetic, like a beautifully
+  typeset modern spec sheet. Warm off-white background, near-black text,
+  one saturated accent (deep electric blue or signal orange). Crisp
+  hairline rules, a clear grid, big confident headings, monospace for
+  code and technical labels. Dark terminal windows sit as high-contrast
+  inset panels against the light page. Disciplined, calm, premium, and
+  uncommon for a developer tool.
+
+  VISUAL STYLE — bold and high-contrast
+  A bold, high-energy, high-contrast dark aesthetic — striking and
+  memorable. Deep dark background, oversized expressive headings, a
+  vivid cyan-to-blue accent used generously, strong geometric structure,
+  dramatic terminal visuals, confident motion. Eye-catching but still
+  clean and professional, built to impress at first glance.

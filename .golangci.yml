@@ -1,0 +1,21 @@
+# golangci-lint v2 configuration — https://golangci-lint.run
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - misspell # common spelling mistakes in comments and strings
+    - unconvert # unnecessary type conversions
+    - nilerr # returning nil when a non-nil error is available
+
+formatters:
+  enable:
+    - gofmt
+    - goimports # enforces the stdlib -> third-party -> internal import grouping
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/hamzawahab/bonjou-cli

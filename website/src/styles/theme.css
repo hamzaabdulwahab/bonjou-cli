@@ -1,0 +1,114 @@
+/*
+ * Bonjou web — dark, phosphor-green operational accent, dim-cyan ghost for the subnet visualization.
+ * Neutrals cool (OKLCH hue ≈230). All design tokens flow from here.
+ */
+
+:root {
+  /* Typography */
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'Menlo', 'Consolas', monospace;
+
+  --font-size: 16px;
+
+  /* Surface — single dark cool base, slight raises for the one stage section */
+  --bg: oklch(15.5% 0.008 230);
+  --surface-1: oklch(19% 0.009 230);
+  --surface-2: oklch(23% 0.010 230);
+  --surface-3: oklch(27% 0.011 230);
+
+  /* Lines */
+  --border: oklch(28% 0.012 230);
+  --border-strong: oklch(37% 0.014 230);
+
+  /* Text */
+  --text: oklch(96% 0.004 230);
+  --text-muted: oklch(72% 0.008 230);
+  --text-dim: oklch(56% 0.010 230);
+
+  /* Operational accent — phosphor green, surgical use only */
+  --accent: oklch(84% 0.155 145);
+  --accent-strong: oklch(78% 0.165 145);
+  --accent-soft: oklch(84% 0.155 145 / 0.12);
+  --accent-contrast: oklch(20% 0.025 145);
+
+  /* Subnet-viz ghost — dim teal-cyan, used only inside the canvas */
+  --ghost: oklch(70% 0.06 200);
+  --ghost-dim: oklch(55% 0.05 200);
+
+  /* Semantic */
+  --warn: oklch(80% 0.10 75);
+  --danger: oklch(65% 0.15 25);
+
+  /* Ring */
+  --ring: oklch(84% 0.155 145 / 0.45);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --shell: min(1080px, 100vw - 96px);
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-ghost: var(--ghost);
+  --color-ghost-dim: var(--ghost-dim);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+}
+
+@layer base {
+  html {
+    font-size: var(--font-size);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
