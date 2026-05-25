@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "./ui";
 
 /**
@@ -52,93 +52,49 @@ export function TypingTerminal({
 }: Props) {
   const reducedMotion = usePrefersReducedMotion();
 
-  // Progress is per-line index; visible up to current line in progress.
-  const [visibleLineIdx, setVisibleLineIdx] = useState(reducedMotion ? lines.length : 0);
-  // For the current prompt line being typed, how many chars are revealed.
-  const [partial, setPartial] = useState<string>("");
-  const [progressFrame, setProgressFrame] = useState<number>(reducedMotion ? PROGRESS_FRAMES.length - 1 : 0);
-  const [cycle, setCycle] = useState(0);
-  const cancelledRef = useRef(false);
+  const totalDuration = useMemo(
+    () => lines.reduce((sum, line) => sum + lineDuration(line, charDelay, lineDelay), 0) + loopHoldMs,
+    [lines, charDelay, lineDelay, loopHoldMs]
+  );
+  const [elapsed, setElapsed] = useState(reducedMotion ? totalDuration : 0);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (reducedMotion) return undefined;
-    cancelledRef.current = false;
+    if (reducedMotion) {
+      setElapsed(totalDuration);
+      return undefined;
+    }
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const sleep = (ms: number) =>
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, ms);
-      });
-
-    const run = async () => {
-      // Reset on cycle change
-      setVisibleLineIdx(0);
-      setPartial("");
-      setProgressFrame(0);
-
-      for (let i = 0; i < lines.length; i += 1) {
-        if (cancelledRef.current) return;
-        const line = lines[i];
-
-        if (line.kind === "prompt") {
-          setVisibleLineIdx(i);
-          // Type characters one at a time.
-          for (let c = 1; c <= line.text.length; c += 1) {
-            if (cancelledRef.current) return;
-            setPartial(line.text.slice(0, c));
-            // Vary pause: spaces faster, punctuation slower.
-            const ch = line.text[c - 1];
-            let delay = charDelay + Math.random() * 24;
-            if (ch === " ") delay = Math.max(10, delay * 0.6);
-            else if (ch === "@") delay *= 1.6;
-            else if (ch === "/") delay *= 1.3;
-            await sleep(delay);
-          }
-          setPartial(line.text); // make sure exact text is set
-          setVisibleLineIdx(i + 1);
-          await sleep(lineDelay);
-        } else if (line.kind === "progress") {
-          setVisibleLineIdx(i + 1);
-          // Step through frames over ~1.2s
-          for (let f = 0; f < PROGRESS_FRAMES.length; f += 1) {
-            if (cancelledRef.current) return;
-            setProgressFrame(f);
-            await sleep(180 + Math.random() * 60);
-          }
-        } else {
-          setVisibleLineIdx(i + 1);
-          await sleep(lineDelay * 0.7);
-        }
-      }
-
-      // Hold at the end
-      await sleep(loopHoldMs);
-      if (!cancelledRef.current) {
-        setCycle((c) => c + 1);
-      }
+    const startedAt = performance.now();
+    const tick = (now: number) => {
+      setElapsed((now - startedAt) % totalDuration);
+      rafRef.current = requestAnimationFrame(tick);
     };
+    rafRef.current = requestAnimationFrame(tick);
 
-    run();
     return () => {
-      cancelledRef.current = true;
-      if (timer) clearTimeout(timer);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [cycle, lines, charDelay, lineDelay, loopHoldMs, reducedMotion]);
+  }, [reducedMotion, totalDuration]);
+
+  const playback = reducedMotion
+    ? { visibleLineIdx: lines.length, partial: "", progressFrame: PROGRESS_FRAMES.length - 1 }
+    : getPlayback(elapsed, lines, charDelay, lineDelay);
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[oklch(10%_0.008_230)] text-[var(--text)]",
-        "shadow-[0_40px_120px_-50px_oklch(0%_0_0/0.7),0_1px_0_oklch(100%_0_0/0.04)_inset]",
+        "relative min-w-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[oklch(12%_0.012_85)] text-[var(--text)]",
+        "shadow-[0_36px_100px_-64px_oklch(0%_0_0/0.8),0_1px_0_oklch(96%_0.012_92/0.045)_inset]",
         className
       )}
     >
       {/* chrome */}
-      <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[oklch(7%_0.008_230)] px-4 py-2.5">
+      <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[oklch(9.5%_0.010_85)] px-4 py-2.5">
         <div className="flex gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-[oklch(40%_0.04_25)]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[oklch(40%_0.04_75)]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[oklch(40%_0.04_145)]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--danger)] opacity-70" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--warn)] opacity-70" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--approve)] opacity-75" />
         </div>
         {title && (
           <div className="flex-1 text-center font-mono text-[11px] tracking-wide text-[var(--text-dim)]">
@@ -149,21 +105,21 @@ export function TypingTerminal({
       </div>
 
       {/* content */}
-      <div className="overflow-x-auto px-6 py-5 font-mono text-[13.5px] leading-[1.85]">
+      <div className="min-w-0 overflow-hidden px-4 py-4 font-mono text-[12px] leading-[1.85] sm:px-6 sm:py-5 sm:text-[13.5px]">
         {lines.map((line, i) => {
-          if (i >= visibleLineIdx + 1) return null;
+          if (i >= playback.visibleLineIdx + 1) return null;
           if (line.kind === "spacer") {
             return <div key={i} className="h-3" aria-hidden />;
           }
 
           if (line.kind === "prompt") {
-            const isCurrent = i === visibleLineIdx;
-            const text = isCurrent ? partial : line.text;
+            const isCurrent = i === playback.visibleLineIdx;
+            const text = isCurrent ? playback.partial : line.text;
             return (
-              <div key={i} className="flex flex-wrap gap-2">
+              <div key={i} className="flex min-w-0 flex-wrap gap-x-2 gap-y-1">
                 <span className="text-[var(--text-dim)]">{line.prompt}</span>
                 <span className="text-[var(--accent)]">$</span>
-                <span className="text-[var(--text)]">
+                <span className="min-w-0 break-words text-[var(--text)]">
                   {text}
                   {isCurrent && <Caret />}
                 </span>
@@ -171,14 +127,14 @@ export function TypingTerminal({
             );
           }
 
-          const indent = "pl-[var(--prompt-indent,5.5rem)]";
+          const indent = "sm:pl-[var(--prompt-indent,5.5rem)]";
 
           if (line.kind === "progress") {
-            const isCurrent = i === visibleLineIdx - 1 && progressFrame < PROGRESS_FRAMES.length - 1;
+            const isCurrent = i === playback.visibleLineIdx - 1 && playback.progressFrame < PROGRESS_FRAMES.length - 1;
             return (
-              <div key={i} className={cn("text-[var(--text)]", indent)}>
+              <div key={i} className={cn("break-words text-[var(--text)]", indent)}>
                 <span className={cn(isCurrent ? "text-[var(--text)]" : "text-[var(--accent)]")}>
-                  {PROGRESS_FRAMES[progressFrame]}
+                  {PROGRESS_FRAMES[playback.progressFrame]}
                 </span>
               </div>
             );
@@ -194,15 +150,15 @@ export function TypingTerminal({
               : "text-[var(--text)]";
 
           return (
-            <div key={i} className={cn(indent, cls)}>
+            <div key={i} className={cn("break-words", indent, cls)}>
               {line.text}
             </div>
           );
         })}
 
         {/* trailing prompt with caret once the cycle has finished */}
-        {visibleLineIdx >= lines.length && (
-          <div className="mt-2 flex gap-2">
+        {playback.visibleLineIdx >= lines.length && (
+          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
             <span className="text-[var(--text-dim)]">alex@studio</span>
             <span className="text-[var(--accent)]">$</span>
             <Caret />
@@ -211,6 +167,49 @@ export function TypingTerminal({
       </div>
     </div>
   );
+}
+
+function lineDuration(line: Line, charDelay: number, lineDelay: number) {
+  if (line.kind === "prompt") return Math.max(180, line.text.length * charDelay) + lineDelay;
+  if (line.kind === "progress") return 1250;
+  return lineDelay * 0.75;
+}
+
+function getPlayback(elapsed: number, lines: Line[], charDelay: number, lineDelay: number) {
+  let remaining = elapsed;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const duration = lineDuration(line, charDelay, lineDelay);
+
+    if (remaining <= duration) {
+      if (line.kind === "prompt") {
+        const typeDuration = Math.max(180, line.text.length * charDelay);
+        if (remaining < typeDuration) {
+          const count = Math.max(0, Math.min(line.text.length, Math.ceil((remaining / typeDuration) * line.text.length)));
+          return {
+            visibleLineIdx: i,
+            partial: line.text.slice(0, count),
+            progressFrame: PROGRESS_FRAMES.length - 1,
+          };
+        }
+      }
+
+      if (line.kind === "progress") {
+        const frame = Math.max(
+          0,
+          Math.min(PROGRESS_FRAMES.length - 1, Math.floor((remaining / duration) * PROGRESS_FRAMES.length))
+        );
+        return { visibleLineIdx: i + 1, partial: "", progressFrame: frame };
+      }
+
+      return { visibleLineIdx: i + 1, partial: "", progressFrame: PROGRESS_FRAMES.length - 1 };
+    }
+
+    remaining -= duration;
+  }
+
+  return { visibleLineIdx: lines.length, partial: "", progressFrame: PROGRESS_FRAMES.length - 1 };
 }
 
 function Caret() {

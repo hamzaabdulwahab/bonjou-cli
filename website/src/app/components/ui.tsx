@@ -7,8 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // ---------------------------------------------------------------------------
-// FadeIn — base scroll choreography
-// 12-16px fade-up on enter view, ease-out, 60ms stagger via `delay`.
+// FadeIn: restrained scroll choreography.
 // ---------------------------------------------------------------------------
 export function FadeIn({
   children,
@@ -49,11 +48,11 @@ export function FadeIn({
 
   const style: React.CSSProperties = {
     transitionDelay: `${delay}ms`,
-    transitionDuration: "700ms",
+    transitionDuration: "620ms",
     transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
     transitionProperty: "opacity, transform",
     opacity: seen ? 1 : 0,
-    transform: seen ? "translateY(0)" : "translateY(14px)",
+    transform: seen ? "translateY(0)" : "translateY(10px)",
     willChange: "opacity, transform",
   };
 
@@ -83,17 +82,17 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] font-semibold",
         "transition-[background-color,color,border-color,box-shadow,transform] duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
         "disabled:pointer-events-none disabled:opacity-50",
         size === "sm" && "h-8 px-3 text-[13px]",
-        size === "md" && "h-10 px-4 text-sm",
+        size === "md" && "h-10 px-4 text-[14px]",
         size === "lg" && "h-11 px-5 text-[14px]",
         variant === "primary" &&
-          "bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-strong)] active:translate-y-px",
+          "border border-[color-mix(in_oklab,var(--accent)_80%,var(--paper))] bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-strong)] active:translate-y-px",
         variant === "secondary" &&
-          "border border-[var(--border-strong)] bg-[var(--surface-1)] text-[var(--text)] hover:bg-[var(--surface-2)]",
+          "border border-[var(--border-strong)] bg-[var(--surface-1)] text-[var(--text)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]",
         variant === "ghost" &&
           "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-1)]",
         className
@@ -120,7 +119,7 @@ export function Pill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] tracking-[0.04em]",
+        "inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border px-2.5 py-1 font-mono text-[11px] tracking-[0.04em]",
         tone === "neutral" &&
           "border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-muted)]",
         tone === "accent" &&
@@ -137,11 +136,11 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--text-dim)]",
+        "inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--text-dim)]",
         className
       )}
     >
-      <span aria-hidden className="h-px w-6 bg-[var(--border-strong)]" />
+      <span aria-hidden className="h-px w-7 bg-[var(--accent)]" />
       {children}
     </div>
   );
@@ -162,10 +161,10 @@ export function Section({
   bleed?: boolean;
 }) {
   return (
-    <section id={id} className={cn("relative", className)}>
+    <section id={id} className={cn("relative min-w-0", className)}>
       <div
-        className={cn(bleed ? "" : "mx-auto px-6 md:px-10")}
-        style={bleed ? undefined : { maxWidth: "var(--shell, min(1080px, 100vw - 96px))" }}
+        className={cn(bleed ? "" : "mx-auto min-w-0 px-4 sm:px-6 lg:px-0")}
+        style={bleed ? undefined : { maxWidth: "var(--shell, min(1180px, calc(100vw - 32px)))" }}
       >
         {children}
       </div>
@@ -178,7 +177,7 @@ export function Divider({ className }: { className?: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// CopyCommand — hero install command, hover-scale, click-to-copy with ripple
+// CopyCommand: copyable install command.
 // ---------------------------------------------------------------------------
 export function CopyCommand({
   command,
@@ -206,10 +205,10 @@ export function CopyCommand({
       type="button"
       onClick={onCopy}
       className={cn(
-        "group relative inline-flex w-full max-w-full items-center justify-between gap-4 overflow-hidden rounded-full",
-        "border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-1)_70%,transparent)] backdrop-blur",
-        "px-5 py-3.5 text-left transition-all duration-200",
-        "hover:border-[var(--border-strong)] hover:bg-[var(--surface-1)]",
+        "group relative inline-flex w-full max-w-full items-center justify-between gap-3 overflow-hidden rounded-[var(--radius-lg)]",
+        "border border-[var(--border-strong)] bg-[var(--surface-1)]",
+        "px-4 py-3 text-left transition-all duration-200 sm:px-5 sm:py-3.5",
+        "hover:border-[var(--accent)] hover:bg-[var(--surface-2)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
         className
       )}
@@ -229,10 +228,10 @@ export function CopyCommand({
         <span aria-hidden className="font-mono text-[14px] font-medium text-[var(--accent)]">
           $
         </span>
-        <code className="truncate font-mono text-[13.5px] text-[var(--text)]">{command}</code>
+        <code className="min-w-0 truncate font-mono text-[12px] text-[var(--text)] sm:text-[13.5px]">{command}</code>
       </span>
 
-      <span className="relative flex shrink-0 items-center gap-2 text-[12px] font-mono">
+      <span className="relative flex shrink-0 items-center gap-2 font-mono text-[11px] sm:text-[12px]">
         <span
           className={cn(
             "transition-opacity duration-200",
@@ -284,10 +283,10 @@ export function InlineCommand({
   };
 
   return (
-    <div className="group flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-1)] px-4 py-3 transition-colors hover:border-[var(--border-strong)]">
+    <div className="group flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-1)] px-3 py-3 transition-colors hover:border-[var(--border-strong)] sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
         <span className="select-none font-mono text-[13px] text-[var(--accent)]">$</span>
-        <code className="truncate font-mono text-[13px] text-[var(--text)]">{command}</code>
+        <code className="min-w-0 truncate font-mono text-[12px] text-[var(--text)] sm:text-[13px]">{command}</code>
       </div>
       <button
         onClick={onCopy}

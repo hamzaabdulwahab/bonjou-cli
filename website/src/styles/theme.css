@@ -1,66 +1,78 @@
 /*
- * Bonjou web — dark, phosphor-green operational accent, dim-cyan ghost for the subnet visualization.
- * Neutrals cool (OKLCH hue ≈230). All design tokens flow from here.
+ * Bonjou web: compact local-network instrument.
+ * Brand colors are translated into OKLCH tokens: dark charcoal, warm paper,
+ * orange command accent, blue network signal, green approval state.
  */
 
 :root {
   /* Typography */
-  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'Menlo', 'Consolas', monospace;
+  --font-display: 'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --font-size: 16px;
 
-  /* Surface — single dark cool base, slight raises for the one stage section */
-  --bg: oklch(15.5% 0.008 230);
-  --surface-1: oklch(19% 0.009 230);
-  --surface-2: oklch(23% 0.010 230);
-  --surface-3: oklch(27% 0.011 230);
+  /* Surfaces */
+  --bg: oklch(15.8% 0.012 85);
+  --bg-soft: oklch(18.2% 0.014 85);
+  --surface-1: oklch(20.5% 0.014 85);
+  --surface-2: oklch(24.5% 0.016 85);
+  --surface-3: oklch(30% 0.018 85);
+  --paper: oklch(96.8% 0.012 92);
 
   /* Lines */
-  --border: oklch(28% 0.012 230);
-  --border-strong: oklch(37% 0.014 230);
+  --border: oklch(31% 0.018 85);
+  --border-strong: oklch(43% 0.022 85);
 
   /* Text */
-  --text: oklch(96% 0.004 230);
-  --text-muted: oklch(72% 0.008 230);
-  --text-dim: oklch(56% 0.010 230);
+  --text: oklch(96.5% 0.012 92);
+  --text-muted: oklch(77% 0.018 92);
+  --text-dim: oklch(61% 0.020 92);
 
-  /* Operational accent — phosphor green, surgical use only */
-  --accent: oklch(84% 0.155 145);
-  --accent-strong: oklch(78% 0.165 145);
-  --accent-soft: oklch(84% 0.155 145 / 0.12);
-  --accent-contrast: oklch(20% 0.025 145);
+  /* Brand accents */
+  --accent: oklch(67% 0.135 42);
+  --accent-strong: oklch(72% 0.145 42);
+  --accent-soft: oklch(67% 0.135 42 / 0.14);
+  --accent-contrast: oklch(18% 0.018 70);
 
-  /* Subnet-viz ghost — dim teal-cyan, used only inside the canvas */
-  --ghost: oklch(70% 0.06 200);
-  --ghost-dim: oklch(55% 0.05 200);
+  --signal: oklch(68% 0.095 250);
+  --signal-soft: oklch(68% 0.095 250 / 0.16);
+  --approve: oklch(62% 0.090 125);
+
+  /* Subnet-viz ghost */
+  --ghost: oklch(67% 0.070 250);
+  --ghost-dim: oklch(52% 0.055 250);
 
   /* Semantic */
   --warn: oklch(80% 0.10 75);
   --danger: oklch(65% 0.15 25);
 
   /* Ring */
-  --ring: oklch(84% 0.155 145 / 0.45);
+  --ring: oklch(67% 0.135 42 / 0.5);
 
   /* Radii */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 999px;
 
   /* Layout */
-  --shell: min(1080px, 100vw - 96px);
+  --shell: min(1180px, calc(100vw - 32px));
+  --section-y: clamp(5rem, 8vw, 8.5rem);
 }
 
 @theme inline {
+  --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
   --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-paper: var(--paper);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-text: var(--text);
@@ -70,6 +82,9 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-accent-contrast: var(--accent-contrast);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-approve: var(--approve);
   --color-ghost: var(--ghost);
   --color-ghost-dim: var(--ghost-dim);
   --color-warn: var(--warn);
@@ -84,13 +99,29 @@
     text-rendering: optimizeLegibility;
     background: var(--bg);
     color-scheme: dark;
+    overflow-x: clip;
   }
 
   body {
     font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    min-width: 320px;
+    overflow-x: clip;
+    font-feature-settings: 'ss01';
+  }
+
+  #root {
+    min-height: 100%;
+    overflow-x: clip;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  img, svg, canvas, video {
+    max-width: 100%;
   }
 
   ::selection {
@@ -104,11 +135,22 @@
     border-radius: 4px;
   }
 
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+    }
+  }
+
+  @media (max-width: 640px) {
+    :root {
+      --shell: min(100vw, calc(100vw - 32px));
+      --section-y: 4.5rem;
     }
   }
 }

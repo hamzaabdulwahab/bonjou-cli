@@ -40,7 +40,7 @@ function writeCache(data: RepoData) {
 }
 
 function formatStars(n: number | null): string {
-  if (n == null) return "—";
+  if (n == null) return "n/a";
   if (n < 1000) return String(n);
   if (n < 10_000) return `${(n / 1000).toFixed(1)}k`;
   return `${Math.round(n / 1000)}k`;

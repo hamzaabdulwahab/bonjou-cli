@@ -3,9 +3,9 @@ import { useEffect, useRef } from "react";
 /**
  * Ambient subnet visualization.
  *
- * Renders a scattered field of dim cyan "peer" nodes onto a <canvas>. Every
+ * Renders a scattered field of dim blue "peer" nodes onto a <canvas>. Every
  * few seconds a random pair of nodes performs a brief handshake: a thin
- * phosphor-green line traces from one to the other and fades, while both
+ * orange line traces from one to the other and fades, while both
  * endpoints pulse momentarily. Idle nodes drift on a slow lissajous so the
  * field is never static.
  *
@@ -39,8 +39,8 @@ type Handshake = {
   duration: number;
 };
 
-const GHOST = "180, 220, 230"; // dim teal-cyan rgb
-const ACCENT = "150, 235, 170"; // phosphor green rgb
+const GHOST = "106, 155, 204"; // brand blue rgb
+const ACCENT = "217, 119, 87"; // brand orange rgb
 
 export function SubnetCanvas({
   className,

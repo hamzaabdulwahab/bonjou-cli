@@ -3,18 +3,18 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   Button,
   CopyCommand,
-  InlineCommand,
-  Eyebrow,
-  Section,
   Divider,
+  Eyebrow,
   FadeIn,
+  InlineCommand,
+  Section,
   cn,
 } from "../components/ui";
 import { FloatingNav } from "../components/FloatingNav";
-import { SubnetCanvas } from "../components/SubnetCanvas";
-import { TypingTerminal, type Line } from "../components/TypingTerminal";
 import { RepoStats } from "../components/RepoStats";
 import { SecurityFlow } from "../components/SecurityFlow";
+import { SubnetCanvas } from "../components/SubnetCanvas";
+import { TypingTerminal, type Line } from "../components/TypingTerminal";
 
 const REPO_URL = "https://github.com/hamzaabdulwahab/bonjou-cli";
 const RELEASE_V120_URL = `${REPO_URL}/releases/tag/v1.2.0`;
@@ -23,9 +23,6 @@ const RAW_INSTALL_SH =
 const RAW_INSTALL_PS1 =
   "iwr https://raw.githubusercontent.com/hamzaabdulwahab/bonjou-cli/main/scripts/install.ps1 -useb | iex";
 
-// ---------------------------------------------------------------------------
-// Hero terminal script — the self-typing sequence
-// ---------------------------------------------------------------------------
 const heroScript: Line[] = [
   { kind: "prompt", prompt: "alex@studio", text: "bonjou" },
   { kind: "dim", text: "bonjou 1.2.0 · listening on 192.168.1.14" },
@@ -45,13 +42,11 @@ const heroScript: Line[] = [
 
 export function Home() {
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] antialiased" id="top">
-      {/* Persistent ambient layer — subnet canvas continues behind every section at low opacity */}
+    <div className="min-h-screen overflow-x-clip bg-[var(--bg)] text-[var(--text)] antialiased" id="top">
       <AmbientLayer />
-
       <FloatingNav />
 
-      <main className="relative">
+      <main className="relative z-10 overflow-x-clip">
         <Hero />
         <SpecStrip />
         <Install />
@@ -70,117 +65,107 @@ export function Home() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// AMBIENT LAYER
-// Fixed full-viewport canvas at very low opacity behind everything.
-// ----------------------------------------------------------------------------
 function AmbientLayer() {
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none fixed inset-0 z-0"
-      style={{ contain: "strict" }}
-    >
-      <SubnetCanvas opacity={0.18} nodeCount={28} handshakeIntervalSec={3.2} />
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-0 opacity-80" style={{ contain: "strict" }}>
+      <SubnetCanvas opacity={0.14} nodeCount={26} handshakeIntervalSec={3.4} />
     </div>
   );
 }
 
-// ----------------------------------------------------------------------------
-// HERO
-// ----------------------------------------------------------------------------
 function Hero() {
   return (
-    <Section className="relative isolate pt-36 pb-24 md:pt-44 md:pb-32">
-      {/* Hero gets its own dedicated canvas instance at full intensity */}
+    <Section className="relative isolate overflow-hidden pb-20 pt-28 sm:pt-32 md:pb-28 lg:pt-36">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[120%]"
+        className="absolute inset-x-0 top-0 -z-10 h-[38rem] rounded-full opacity-70"
         style={{
-          maskImage:
-            "radial-gradient(ellipse at 50% 30%, oklch(0% 0 0 / 1) 0%, oklch(0% 0 0 / 0.85) 45%, oklch(0% 0 0 / 0) 80%)",
+          background:
+            "radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 62%)",
         }}
-      >
-        <SubnetCanvas opacity={0.9} nodeCount={32} handshakeIntervalSec={1.7} />
-      </div>
-
-      {/* Gradient floor that fades the canvas into the page */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-48 bg-gradient-to-b from-transparent to-[var(--bg)]"
       />
 
-      <div className="relative mx-auto flex flex-col items-center text-center">
-        <FadeIn>
-          <Eyebrow>
-            <span>v1.2.0</span>
-            <span aria-hidden className="text-[var(--border-strong)]">·</span>
+      <div className="grid min-w-0 items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] lg:gap-14">
+        <FadeIn className="min-w-0">
+          <div className="mb-7 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+            <span>Bonjou v1.2.0</span>
+            <span className="h-px w-8 bg-[var(--border-strong)]" aria-hidden />
             <span>macOS · Linux · Windows</span>
-          </Eyebrow>
-        </FadeIn>
+          </div>
 
-        <FadeIn delay={80}>
-          <h1
-            className="mt-7 max-w-[14ch] text-[3.25rem] font-semibold leading-[0.98] tracking-[-0.04em] text-[var(--text)] md:text-[5rem]"
-            style={{ fontFamily: "var(--font-sans)" }}
-          >
-            Hello,
-            <br />
-            <span className="text-[var(--accent)]">local network.</span>
+          <h1 className="max-w-[11ch] text-[clamp(3rem,7vw,5.7rem)] font-bold leading-[0.94] tracking-[-0.055em] text-[var(--text)]">
+            Local transfer from the terminal.
           </h1>
-        </FadeIn>
 
-        <FadeIn delay={160}>
-          <p className="mt-6 max-w-[52ch] text-balance text-[16px] leading-[1.65] text-[var(--text-muted)] md:text-[17px]">
-            A terminal CLI for LAN chat and file transfer. Bonjou finds the machines on your
-            subnet and moves messages, files, and folders between them. No account, no relay,
-            no cloud.
+          <p className="mt-7 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--text-muted)] sm:text-[18px]">
+            Bonjou finds peers on your LAN, opens a direct encrypted channel, and moves
+            messages, files, and folders without accounts, cloud drives, or a central relay.
           </p>
-        </FadeIn>
 
-        <FadeIn delay={260} className="mt-10 w-full max-w-[640px]">
-          <CopyCommand command={RAW_INSTALL_SH} />
-          <div className="mt-4 flex items-center justify-center gap-1.5 text-[12.5px] text-[var(--text-dim)]">
-            <span>or</span>
-            <a
-              href="#install"
-              className="font-medium text-[var(--text-muted)] underline-offset-4 transition-colors hover:text-[var(--text)] hover:underline"
-            >
-              pick a package manager
-            </a>
-            <span aria-hidden>→</span>
+          <div className="mt-9 max-w-[680px]">
+            <CopyCommand command={RAW_INSTALL_SH} />
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-[var(--text-dim)]">
+              <a
+                href="#install"
+                className="font-semibold text-[var(--text-muted)] underline-offset-4 transition-colors hover:text-[var(--text)] hover:underline"
+              >
+                Choose another installer
+              </a>
+              <span aria-hidden>·</span>
+              <a
+                href={REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[var(--text-muted)] underline-offset-4 transition-colors hover:text-[var(--text)] hover:underline"
+              >
+                Read the source
+              </a>
+            </div>
           </div>
         </FadeIn>
 
-        <FadeIn delay={380} className="mt-16 w-full max-w-[720px]">
-          <TypingTerminal title="bonjou — local network" lines={heroScript} />
+        <FadeIn delay={120} className="min-w-0">
+          <div className="grid min-w-0 gap-4">
+            <TypingTerminal title="bonjou · local network" lines={heroScript} charDelay={10} lineDelay={120} />
+            <div className="grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--border)] sm:grid-cols-3">
+              <HeroDatum label="Discovery" value="UDP 46320" />
+              <HeroDatum label="Transfer" value="TCP 46321" />
+              <HeroDatum label="Trust" value="TOFU pinning" />
+            </div>
+          </div>
         </FadeIn>
       </div>
     </Section>
   );
 }
 
-// ----------------------------------------------------------------------------
-// SPEC STRIP
-// ----------------------------------------------------------------------------
+function HeroDatum({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 bg-[var(--bg-soft)] px-4 py-4">
+      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{label}</div>
+      <div className="mt-1 break-words font-mono text-[13px] text-[var(--text)]">{value}</div>
+    </div>
+  );
+}
+
 function SpecStrip() {
   const specs = [
-    { label: "Discovery", value: "UDP 46320" },
-    { label: "Transfer", value: "TCP 46321" },
-    { label: "Wire format", value: "Envelope v2 · AES-256-GCM" },
-    { label: "Peer trust", value: "TOFU fingerprint pinning" },
+    { label: "Wire format", value: "Envelope v2" },
+    { label: "Cipher", value: "AES-256-GCM" },
+    { label: "Approval", value: "metadata first" },
+    { label: "State", value: "~/.bonjou" },
   ];
 
   return (
-    <Section className="relative py-10 md:py-12">
+    <Section className="py-8 sm:py-10">
       <Divider />
-      <div className="grid grid-cols-2 gap-y-6 py-10 md:grid-cols-4 md:gap-x-10">
+      <div className="grid grid-cols-2 gap-px bg-[var(--border)] md:grid-cols-4">
         {specs.map((s, i) => (
-          <FadeIn key={s.label} delay={i * 60} className="flex flex-col gap-1.5">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
+          <FadeIn key={s.label} delay={i * 45} className="min-w-0 bg-[var(--bg)] px-3 py-5 sm:px-5">
+            <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
               {s.label}
             </span>
-            <span className="font-mono text-[13px] text-[var(--text)]">{s.value}</span>
+            <span className="mt-1 block break-words font-mono text-[13px] text-[var(--text)]">{s.value}</span>
           </FadeIn>
         ))}
       </div>
@@ -189,9 +174,6 @@ function SpecStrip() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// INSTALL
-// ----------------------------------------------------------------------------
 function Install() {
   const [os, setOs] = useState<"macOS" | "Linux" | "Windows">("macOS");
 
@@ -219,32 +201,27 @@ function Install() {
   const tabs = Object.keys(recipes) as Array<keyof typeof recipes>;
 
   return (
-    <Section id="install" className="py-28 md:py-36">
-      <div className="grid gap-14 lg:grid-cols-[20rem_1fr] lg:gap-20">
-        <FadeIn>
-          <Eyebrow>02 · Install</Eyebrow>
-          <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-            One binary,
-            <br />
-            three operating systems.
-          </h2>
-          <p className="mt-5 max-w-[34ch] text-[15px] leading-[1.65] text-[var(--text-muted)]">
-            Bonjou ships as a self-contained executable. Pick the path that matches your machine.
-          </p>
+    <Section id="install" className="py-[var(--section-y)]">
+      <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] lg:gap-16">
+        <SectionHeading
+          index="01"
+          label="Install"
+          title="One binary, three operating systems."
+          body="The fastest path is the install script. Package managers and source installs stay visible for locked-down machines."
+        >
           <a
             href={`${REPO_URL}/releases/latest`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-2 text-[13px] font-medium text-[var(--accent)] hover:text-[var(--accent-strong)]"
+            className="mt-6 inline-flex text-[14px] font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
           >
             All releases
-            <span aria-hidden>→</span>
           </a>
-        </FadeIn>
+        </SectionHeading>
 
-        <FadeIn delay={120}>
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-1)]">
-            <div role="tablist" className="flex border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-1)_50%,var(--surface-2))]">
+        <FadeIn delay={120} className="min-w-0">
+          <div className="min-w-0 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-1)]">
+            <div role="tablist" className="grid grid-cols-3 border-b border-[var(--border)] bg-[var(--bg-soft)]">
               {tabs.map((t) => (
                 <button
                   key={t}
@@ -252,43 +229,27 @@ function Install() {
                   aria-selected={os === t}
                   onClick={() => setOs(t)}
                   className={cn(
-                    "relative flex-1 px-5 py-3 text-[13px] font-medium transition-colors",
-                    os === t
-                      ? "text-[var(--text)]"
-                      : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                    "relative min-w-0 px-2 py-3 text-[13px] font-semibold transition-colors sm:px-5",
+                    os === t ? "text-[var(--text)]" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                   )}
                 >
                   {t}
                   {os === t && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-x-5 bottom-0 h-[2px] bg-[var(--accent)]"
-                    />
+                    <span aria-hidden className="absolute inset-x-3 bottom-0 h-[2px] bg-[var(--accent)] sm:inset-x-5" />
                   )}
                 </button>
               ))}
             </div>
 
-            <div className="p-6 md:p-8">
+            <div className="min-w-0 p-4 sm:p-6 md:p-8">
               <div className="space-y-5">
                 {recipes[os].map((r) => (
-                  <div key={r.label} className="space-y-2">
-                    <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                      {r.label}
-                    </div>
-                    <InlineCommand command={r.command} label={r.label} />
-                  </div>
+                  <CommandBlock key={r.label} label={r.label} command={r.command} />
                 ))}
               </div>
 
               <Divider className="my-8" />
-
-              <div className="space-y-2">
-                <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                  From source · any platform
-                </div>
-                <InlineCommand command="go install github.com/hamzawahab/bonjou-cli/cmd/bonjou@latest" />
-              </div>
+              <CommandBlock label="From source · any platform" command="go install github.com/hamzawahab/bonjou-cli/cmd/bonjou@latest" />
             </div>
           </div>
         </FadeIn>
@@ -297,9 +258,15 @@ function Install() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// WALKTHROUGH — the one raised stage on the page
-// ----------------------------------------------------------------------------
+function CommandBlock({ label, command }: { label: string; command: string }) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{label}</div>
+      <InlineCommand command={command} label={label} />
+    </div>
+  );
+}
+
 function Walkthrough() {
   const alexLines: Line[] = [
     { kind: "prompt", prompt: "alex@studio", text: "bonjou" },
@@ -316,52 +283,36 @@ function Walkthrough() {
     { kind: "prompt", prompt: "sarah@thinkpad", text: "bonjou" },
     { kind: "dim", text: "listening on 192.168.1.22 · 3 peers" },
     { kind: "spacer" },
-    { kind: "out", text: "→ incoming · folder from alex" },
+    { kind: "out", text: "incoming · folder from alex" },
     { kind: "dim", text: "assets/ · 12 items · 45.2 MB · fingerprint a4:7c…" },
     { kind: "prompt", prompt: "sarah@thinkpad", text: "@view 1" },
-    { kind: "dim", text: "manifest · 12 files · top-level: img / fonts / brand.json" },
+    { kind: "dim", text: "manifest · 12 files · img / fonts / brand.json" },
     { kind: "prompt", prompt: "sarah@thinkpad", text: "@approve 1" },
-    { kind: "dim", text: "writing to ~/.bonjou/received/folders/assets/" },
     { kind: "success", text: "done · 12 files" },
   ];
 
   return (
-    <Section className="py-28 md:py-36">
-      <FadeIn className="mb-14 max-w-2xl">
-        <Eyebrow>03 · Walkthrough</Eyebrow>
-        <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-          Two terminals.
-          <br />
-          One subnet.
-        </h2>
-        <p className="mt-5 text-[15px] leading-[1.65] text-[var(--text-muted)]">
-          Alex offers a folder. Sarah sees the metadata first, inspects it, and approves
-          explicitly. Bonjou never writes a byte to her disk until she does.
-        </p>
-      </FadeIn>
+    <Section className="py-[var(--section-y)]">
+      <SectionHeading
+        index="02"
+        label="Walkthrough"
+        title="Nothing lands on disk until the receiver approves it."
+        body="Bonjou keeps the workflow terminal-native, but the transfer model is intentionally conservative: offer metadata first, inspect, then approve."
+      />
 
-      {/* the raised stage */}
-      <FadeIn delay={140}>
-        <div
-          className={cn(
-            "relative overflow-hidden rounded-3xl border border-[var(--border)]",
-            "bg-[color-mix(in_oklab,var(--surface-1)_70%,transparent)] backdrop-blur",
-            "p-6 md:p-10",
-            "shadow-[0_60px_120px_-60px_oklch(0%_0_0/0.7),0_1px_0_oklch(100%_0_0/0.04)_inset]"
-          )}
-        >
-          {/* faint connection line crossing the two terminals */}
+      <FadeIn delay={120} className="mt-10 min-w-0">
+        <div className="relative min-w-0 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--bg-soft)] p-4 sm:p-6 lg:p-8">
           <div
             aria-hidden
-            className="pointer-events-none absolute left-0 right-0 top-1/2 hidden h-px -translate-y-1/2 lg:block"
+            className="absolute left-0 right-0 top-1/2 hidden h-px -translate-y-1/2 lg:block"
             style={{
               background:
-                "linear-gradient(90deg, transparent 8%, color-mix(in oklab, var(--accent) 28%, transparent) 50%, transparent 92%)",
+                "linear-gradient(90deg, transparent 6%, color-mix(in oklab, var(--signal) 50%, transparent), color-mix(in oklab, var(--accent) 42%, transparent), transparent 94%)",
             }}
           />
-          <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
-            <TypingTerminal title="alex@studio" lines={alexLines} charDelay={32} loopHoldMs={8000} />
-            <TypingTerminal title="sarah@thinkpad" lines={sarahLines} charDelay={28} loopHoldMs={8000} />
+          <div className="grid min-w-0 gap-5 lg:grid-cols-2 lg:gap-8">
+            <TypingTerminal title="alex@studio" lines={alexLines} charDelay={30} loopHoldMs={8000} />
+            <TypingTerminal title="sarah@thinkpad" lines={sarahLines} charDelay={27} loopHoldMs={8000} />
           </div>
         </div>
       </FadeIn>
@@ -369,9 +320,6 @@ function Walkthrough() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// FEATURES
-// ----------------------------------------------------------------------------
 function Features() {
   const rows = [
     {
@@ -407,28 +355,19 @@ function Features() {
   ];
 
   return (
-    <Section id="features" className="py-28 md:py-36">
-      <FadeIn className="mb-16 max-w-2xl">
-        <Eyebrow>04 · Features</Eyebrow>
-        <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-          What the binary does.
-        </h2>
-      </FadeIn>
+    <Section id="features" className="py-[var(--section-y)]">
+      <SectionHeading index="03" label="Features" title="Built around the real LAN workflow." />
 
-      <div className="border-t border-[var(--border)]">
+      <div className="mt-10 border-t border-[var(--border)]">
         {rows.map((r, i) => (
-          <FadeIn key={r.tag} delay={i * 50}>
-            <article className="group grid grid-cols-1 gap-2 border-b border-[var(--border)] py-7 transition-colors hover:bg-[color-mix(in_oklab,var(--surface-1)_60%,transparent)] md:grid-cols-[10rem_minmax(0,1fr)] md:gap-10 md:py-8">
-              <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-[var(--accent)]">
-                {r.tag}
-              </div>
-              <div>
-                <h3 className="text-[19px] font-medium leading-[1.35] text-[var(--text)]">
+          <FadeIn key={r.tag} delay={i * 45}>
+            <article className="group grid min-w-0 gap-3 border-b border-[var(--border)] py-6 transition-colors hover:bg-[color-mix(in_oklab,var(--surface-1)_55%,transparent)] md:grid-cols-[minmax(0,10rem)_minmax(0,1fr)] md:gap-10 md:py-7">
+              <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--accent)]">{r.tag}</div>
+              <div className="min-w-0">
+                <h3 className="text-[20px] font-semibold leading-[1.25] tracking-[-0.015em] text-[var(--text)]">
                   {r.title}
                 </h3>
-                <p className="mt-2 max-w-[64ch] text-[14.5px] leading-[1.65] text-[var(--text-muted)]">
-                  {r.body}
-                </p>
+                <p className="mt-2 max-w-[68ch] text-[15px] leading-[1.65] text-[var(--text-muted)]">{r.body}</p>
               </div>
             </article>
           </FadeIn>
@@ -438,9 +377,6 @@ function Features() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// COMPARISON
-// ----------------------------------------------------------------------------
 function Comparison() {
   const rows = [
     {
@@ -450,7 +386,7 @@ function Comparison() {
     },
     {
       alt: "AirDrop-style sharing",
-      tradeoff: "Bound to a single vendor's ecosystem.",
+      tradeoff: "Bound to a single vendor ecosystem.",
       bonjou: "macOS, Linux, and Windows talk to each other.",
     },
     {
@@ -466,58 +402,62 @@ function Comparison() {
   ];
 
   return (
-    <Section className="py-28 md:py-36">
-      <FadeIn className="mb-14 max-w-2xl">
-        <Eyebrow>05 · Why Bonjou</Eyebrow>
-        <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-          Compared with the usual alternatives.
-        </h2>
-      </FadeIn>
+    <Section className="py-[var(--section-y)]">
+      <SectionHeading index="04" label="Why Bonjou" title="A local tool for local work." />
 
-      <FadeIn delay={100}>
-        <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-1)_45%,transparent)] backdrop-blur">
-          <table className="w-full min-w-[640px] border-collapse text-left">
+      <FadeIn delay={100} className="mt-10">
+        <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-1)]">
+          <table className="hidden w-full table-fixed border-collapse text-left md:table">
             <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th className="w-[24%] px-6 py-4 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                  Alternative
-                </th>
-                <th className="px-6 py-4 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                  Tradeoff
-                </th>
-                <th className="px-6 py-4 font-mono text-[10.5px] font-medium uppercase tracking-[0.18em] text-[var(--accent)]">
-                  Bonjou
-                </th>
+              <tr className="border-b border-[var(--border)] bg-[var(--bg-soft)]">
+                <Th>Alternative</Th>
+                <Th>Tradeoff</Th>
+                <Th accent>Bonjou</Th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr
-                  key={i}
-                  className={cn("border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-1)]", i === 0 && "border-t-0")}
-                >
-                  <td className="px-6 py-5 align-top text-[14.5px] font-medium text-[var(--text)]">
-                    {r.alt}
-                  </td>
-                  <td className="px-6 py-5 align-top text-[14px] leading-[1.6] text-[var(--text-muted)]">
-                    {r.tradeoff}
-                  </td>
-                  <td className="px-6 py-5 align-top text-[14px] leading-[1.6] text-[var(--text)]">
-                    {r.bonjou}
-                  </td>
+              {rows.map((r) => (
+                <tr key={r.alt} className="border-t border-[var(--border)] first:border-t-0">
+                  <td className="w-[24%] px-5 py-5 align-top text-[15px] font-semibold text-[var(--text)]">{r.alt}</td>
+                  <td className="px-5 py-5 align-top text-[15px] leading-[1.6] text-[var(--text-muted)]">{r.tradeoff}</td>
+                  <td className="px-5 py-5 align-top text-[15px] leading-[1.6] text-[var(--text)]">{r.bonjou}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          <div className="divide-y divide-[var(--border)] md:hidden">
+            {rows.map((r) => (
+              <article key={r.alt} className="p-4">
+                <h3 className="text-[16px] font-semibold text-[var(--text)]">{r.alt}</h3>
+                <p className="mt-2 text-[14px] leading-[1.55] text-[var(--text-muted)]">{r.tradeoff}</p>
+                <p className="mt-3 border-t border-[var(--border)] pt-3 text-[14px] leading-[1.55] text-[var(--text)]">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--accent)]">Bonjou</span>
+                  <br />
+                  {r.bonjou}
+                </p>
+              </article>
+            ))}
+          </div>
         </div>
       </FadeIn>
     </Section>
   );
 }
 
-// ----------------------------------------------------------------------------
-// COMMANDS — the full 22-command surface
-// ----------------------------------------------------------------------------
+function Th({ children, accent = false }: { children: string; accent?: boolean }) {
+  return (
+    <th
+      className={cn(
+        "px-5 py-4 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em]",
+        accent ? "text-[var(--accent)]" : "text-[var(--text-dim)]"
+      )}
+    >
+      {children}
+    </th>
+  );
+}
+
 function Commands() {
   const [query, setQuery] = useState("");
 
@@ -575,23 +515,16 @@ function Commands() {
   const filtered = groups
     .map((g) => ({
       ...g,
-      items: g.items.filter(
-        (i) => i.cmd.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)
-      ),
+      items: g.items.filter((i) => i.cmd.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)),
     }))
     .filter((g) => g.items.length > 0);
 
   return (
-    <Section id="commands" className="py-28 md:py-36">
-      <FadeIn className="mb-12 flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-        <div className="max-w-2xl">
-          <Eyebrow>06 · Reference</Eyebrow>
-          <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-            Everything happens at the prompt.
-          </h2>
-        </div>
+    <Section id="commands" className="py-[var(--section-y)]">
+      <FadeIn className="flex min-w-0 flex-col justify-between gap-6 md:flex-row md:items-end">
+        <SectionHeading index="05" label="Reference" title="The command surface stays small enough to remember." compact />
 
-        <label className="relative w-full md:w-72">
+        <label className="relative w-full min-w-0 md:w-80">
           <span className="sr-only">Search commands</span>
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
@@ -599,35 +532,31 @@ function Commands() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search 22 commands"
-            className="w-full rounded-full border border-[var(--border)] bg-[var(--surface-1)] py-2 pl-9 pr-3 font-mono text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] transition-colors focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]"
+            className="h-11 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-1)] py-2 pl-9 pr-3 font-mono text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]"
           />
         </label>
       </FadeIn>
 
-      <div className="space-y-12">
+      <div className="mt-10 space-y-10">
         {filtered.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[var(--border)] py-10 text-center font-mono text-[13px] text-[var(--text-dim)]">
+          <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] py-10 text-center font-mono text-[13px] text-[var(--text-dim)]">
             no match for "{query}"
           </div>
         ) : (
           filtered.map((g, gi) => (
-            <FadeIn key={g.name} delay={gi * 80}>
-              <h3 className="mb-4 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--text-dim)]">
-                {g.name}
-              </h3>
-              <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-1)_60%,transparent)] backdrop-blur">
+            <FadeIn key={g.name} delay={gi * 60}>
+              <h3 className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{g.name}</h3>
+              <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-1)]">
                 {g.items.map((it, j) => (
                   <div
                     key={it.cmd}
                     className={cn(
-                      "grid grid-cols-1 gap-1 px-5 py-4 transition-colors hover:bg-[var(--surface-1)] md:grid-cols-[18rem_minmax(0,1fr)] md:gap-6",
+                      "grid min-w-0 gap-1 px-4 py-4 transition-colors hover:bg-[var(--surface-2)] md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] md:gap-6 md:px-5",
                       j !== 0 && "border-t border-[var(--border)]"
                     )}
                   >
-                    <code className="font-mono text-[13px] text-[var(--accent)]">{it.cmd}</code>
-                    <span className="text-[14px] leading-[1.55] text-[var(--text-muted)]">
-                      {it.desc}
-                    </span>
+                    <code className="min-w-0 break-words font-mono text-[13px] text-[var(--accent)]">{it.cmd}</code>
+                    <span className="min-w-0 text-[14.5px] leading-[1.55] text-[var(--text-muted)]">{it.desc}</span>
                   </div>
                 ))}
               </div>
@@ -639,9 +568,6 @@ function Commands() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// SECURITY — animated flow + guarantees
-// ----------------------------------------------------------------------------
 function Security() {
   const guarantees = [
     {
@@ -659,44 +585,38 @@ function Security() {
   ];
 
   return (
-    <Section id="security" className="py-28 md:py-36">
-      <FadeIn className="mb-14 max-w-2xl">
-        <Eyebrow>07 · Security</Eyebrow>
-        <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-          Designed for explicit control.
-        </h2>
-        <p className="mt-5 text-[15px] leading-[1.65] text-[var(--text-muted)]">
-          Nothing leaves your subnet. Nothing lands on disk before you say so.
-        </p>
-      </FadeIn>
+    <Section id="security" className="py-[var(--section-y)]">
+      <SectionHeading
+        index="06"
+        label="Security"
+        title="Designed for explicit control."
+        body="Nothing leaves your subnet. Nothing lands on disk before you say so."
+      />
 
-      <FadeIn delay={120} className="mb-10">
+      <FadeIn delay={120} className="mt-10">
         <SecurityFlow />
       </FadeIn>
 
-      <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)] md:grid-cols-3">
+      <div className="mt-8 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--border)] md:grid-cols-3">
         {guarantees.map((g, i) => (
-          <FadeIn key={g.title} delay={140 + i * 80}>
-            <div className="h-full bg-[var(--bg)] p-6 md:p-8">
-              <h4 className="text-[15.5px] font-medium leading-[1.4] text-[var(--text)]">
-                {g.title}
-              </h4>
-              <p className="mt-3 text-[13.5px] leading-[1.65] text-[var(--text-muted)]">{g.body}</p>
+          <FadeIn key={g.title} delay={140 + i * 60}>
+            <div className="h-full bg-[var(--bg)] p-5 sm:p-6 md:p-7">
+              <h4 className="text-[16px] font-semibold leading-[1.35] text-[var(--text)]">{g.title}</h4>
+              <p className="mt-3 text-[14.5px] leading-[1.65] text-[var(--text-muted)]">{g.body}</p>
             </div>
           </FadeIn>
         ))}
       </div>
 
-      <FadeIn delay={420} className="mt-10">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] p-6 md:p-8">
-          <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--warn)]">
+      <FadeIn delay={360} className="mt-8">
+        <div className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--warn)_35%,var(--border))] bg-[color-mix(in_oklab,var(--warn)_8%,var(--surface-1))] p-5 sm:p-6">
+          <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--warn)]">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--warn)]" />
             Known limits
           </div>
-          <p className="mt-3 max-w-[68ch] text-[14px] leading-[1.65] text-[var(--text-muted)]">
+          <p className="mt-3 max-w-[72ch] text-[14.5px] leading-[1.65] text-[var(--text-muted)]">
             Discovery uses UDP broadcast, which most routers drop between VLANs and subnets. Bonjou
-            will find peers on the same broadcast domain only, unless a relay is configured on your
-            network hardware.
+            finds peers on the same broadcast domain only, unless a relay is configured on network hardware.
           </p>
         </div>
       </FadeIn>
@@ -704,41 +624,22 @@ function Security() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// OPEN SOURCE — v1.2.0 highlights merged in
-// ----------------------------------------------------------------------------
 function OpenSource() {
   const highlights = [
-    {
-      tag: "new",
-      title: "Metadata-first approval queue",
-      body: "No bytes hit disk before you call @approve.",
-    },
-    {
-      tag: "new",
-      title: "Six new queue commands",
-      body: "@queue, @view, @approve, @reject, @approveAll, @rejectAll.",
-    },
-    {
-      tag: "improved",
-      title: "Queue survives restarts",
-      body: "Pending approvals persist across process restarts.",
-    },
+    { tag: "new", title: "Metadata-first approval queue", body: "No bytes hit disk before you call @approve." },
+    { tag: "new", title: "Six queue commands", body: "@queue, @view, @approve, @reject, @approveAll, @rejectAll." },
+    { tag: "improved", title: "Queue survives restarts", body: "Pending approvals persist across process restarts." },
   ];
 
   return (
-    <Section id="open-source" className="py-28 md:py-36">
-      <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-20">
-        <FadeIn className="max-w-[36ch]">
-          <Eyebrow>08 · Open source</Eyebrow>
-          <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-            Written in Go.
-            <br />
-            Released under MIT.
-          </h2>
-          <p className="mt-5 text-[15px] leading-[1.65] text-[var(--text-muted)]">
-            The source is small enough to read end to end. Audits, forks, and patches are welcome.
-          </p>
+    <Section id="open-source" className="py-[var(--section-y)]">
+      <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:gap-16">
+        <SectionHeading
+          index="07"
+          label="Open source"
+          title="Written in Go. Released under MIT."
+          body="The source is small enough to read end to end. Audits, forks, and patches are welcome."
+        >
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <Button variant="secondary" onClick={() => window.open(REPO_URL, "_blank")}>
               <GithubIcon />
@@ -746,59 +647,42 @@ function OpenSource() {
             </Button>
             <RepoStats />
           </div>
+        </SectionHeading>
 
-          {/* v1.2.0 inline highlights */}
-          <div className="mt-10">
-            <div className="mb-4 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--text-dim)]">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-              Latest · v1.2.0
+        <FadeIn delay={120} className="min-w-0">
+          <div className="grid min-w-0 gap-6 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-1)] p-5 sm:p-6 md:p-8">
+            <div className="min-w-0">
+              <div className="mb-4 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                Latest · v1.2.0
+              </div>
+              <ul className="space-y-4">
+                {highlights.map((h) => (
+                  <li key={h.title} className="grid min-w-0 grid-cols-[4.75rem_minmax(0,1fr)] gap-4">
+                    <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--accent)]">{h.tag}</span>
+                    <div className="min-w-0">
+                      <div className="text-[15px] font-semibold text-[var(--text)]">{h.title}</div>
+                      <div className="text-[14px] leading-[1.55] text-[var(--text-muted)]">{h.body}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={RELEASE_V120_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex text-[14px] font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+              >
+                Full release notes
+              </a>
             </div>
-            <ul className="space-y-3">
-              {highlights.map((h) => (
-                <li key={h.title} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--accent)]">
-                    {h.tag}
-                  </span>
-                  <div>
-                    <div className="text-[14px] font-medium text-[var(--text)]">{h.title}</div>
-                    <div className="text-[13px] text-[var(--text-muted)]">{h.body}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <a
-              href={RELEASE_V120_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 inline-flex items-center gap-2 text-[13px] font-medium text-[var(--accent)] hover:text-[var(--accent-strong)]"
-            >
-              Full release notes
-              <span aria-hidden>→</span>
-            </a>
-          </div>
-        </FadeIn>
 
-        <FadeIn delay={140}>
-          <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-1)_55%,transparent)] backdrop-blur p-6 md:p-8">
-            <div className="space-y-4">
-              <div>
-                <div className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                  Clone
-                </div>
-                <InlineCommand command="git clone https://github.com/hamzaabdulwahab/bonjou-cli.git" />
-              </div>
-              <div>
-                <div className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                  Run
-                </div>
-                <InlineCommand command="go run ./cmd/bonjou" />
-              </div>
-              <div>
-                <div className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                  Test
-                </div>
-                <InlineCommand command="go test ./..." />
-              </div>
+            <Divider />
+
+            <div className="min-w-0 space-y-4">
+              <CommandBlock label="Clone" command="git clone https://github.com/hamzaabdulwahab/bonjou-cli.git" />
+              <CommandBlock label="Run" command="go run ./cmd/bonjou" />
+              <CommandBlock label="Test" command="go test ./..." />
             </div>
           </div>
         </FadeIn>
@@ -807,9 +691,6 @@ function OpenSource() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// FAQ
-// ----------------------------------------------------------------------------
 function FAQ() {
   const faqs = [
     {
@@ -841,40 +722,35 @@ function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <Section className="py-28 md:py-36">
-      <div className="grid gap-14 lg:grid-cols-[20rem_1fr] lg:gap-20">
-        <FadeIn>
-          <Eyebrow>09 · Questions</Eyebrow>
-          <h2 className="mt-5 text-[2rem] font-semibold leading-[1.05] tracking-[-0.03em] md:text-[2.5rem]">
-            Common questions.
-          </h2>
-        </FadeIn>
+    <Section className="py-[var(--section-y)]">
+      <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] lg:gap-16">
+        <SectionHeading index="08" label="Questions" title="Common questions." compact />
 
-        <FadeIn delay={120} className="border-t border-[var(--border)]">
+        <FadeIn delay={120} className="min-w-0 border-t border-[var(--border)]">
           {faqs.map((f, i) => {
             const isOpen = open === i;
             return (
               <div key={f.q} className="border-b border-[var(--border)]">
                 <button
                   onClick={() => setOpen(isOpen ? null : i)}
-                  className="flex w-full items-center justify-between gap-6 py-5 text-left"
+                  className="flex w-full min-w-0 items-center justify-between gap-5 py-5 text-left"
                   aria-expanded={isOpen}
                 >
-                  <span className="text-[15.5px] font-medium text-[var(--text)]">{f.q}</span>
+                  <span className="min-w-0 text-[16px] font-semibold text-[var(--text)]">{f.q}</span>
                   <PlusIcon className={cn("shrink-0 text-[var(--text-dim)] transition-transform duration-300", isOpen && "rotate-45 text-[var(--accent)]")} />
                 </button>
                 <AnimatePresence initial={false}>
                   {isOpen && (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                      style={{ overflow: "hidden" }}
+                      initial={{ gridTemplateRows: "0fr", opacity: 0 }}
+                      animate={{ gridTemplateRows: "1fr", opacity: 1 }}
+                      exit={{ gridTemplateRows: "0fr", opacity: 0 }}
+                      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                      className="grid"
                     >
-                      <p className="max-w-[64ch] pb-6 pr-12 text-[14.5px] leading-[1.7] text-[var(--text-muted)]">
-                        {f.a}
-                      </p>
+                      <div className="overflow-hidden">
+                        <p className="max-w-[68ch] pb-6 pr-8 text-[15px] leading-[1.7] text-[var(--text-muted)]">{f.a}</p>
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -887,53 +763,41 @@ function FAQ() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// FINAL CTA
-// ----------------------------------------------------------------------------
 function FinalCTA() {
   return (
-    <Section className="py-32 md:py-40">
-      <FadeIn className="mx-auto max-w-3xl text-center">
+    <Section className="py-[var(--section-y)]">
+      <FadeIn className="mx-auto max-w-4xl text-center">
         <Eyebrow className="justify-center">Start using Bonjou</Eyebrow>
-        <h2 className="mt-6 text-[2.5rem] font-semibold leading-[0.98] tracking-[-0.035em] md:text-[3.75rem]">
+        <h2 className="mt-6 text-[clamp(2.4rem,6vw,4.6rem)] font-bold leading-[0.96] tracking-[-0.05em]">
           Move files across the room.
           <br />
-          <span className="text-[var(--text-muted)]">Not across the planet.</span>
+          <span className="text-[var(--text-muted)]">Keep the trip local.</span>
         </h2>
-        <p className="mt-6 text-[16px] leading-[1.65] text-[var(--text-muted)]">
+        <p className="mx-auto mt-6 max-w-[56ch] text-[17px] leading-[1.65] text-[var(--text-muted)]">
           One binary. No signup. Works on the network you are already on.
         </p>
-        <div className="mt-10 w-full">
-          <div className="mx-auto max-w-[640px]">
-            <CopyCommand command={RAW_INSTALL_SH} />
-          </div>
-          <div className="mt-4 flex items-center justify-center gap-1.5 text-[12.5px] text-[var(--text-dim)]">
-            <span>or</span>
-            <a
-              href="#install"
-              className="font-medium text-[var(--text-muted)] underline-offset-4 transition-colors hover:text-[var(--text)] hover:underline"
-            >
-              pick a package manager
-            </a>
-            <span aria-hidden>→</span>
-          </div>
+        <div className="mx-auto mt-9 max-w-[680px]">
+          <CopyCommand command={RAW_INSTALL_SH} />
+          <a
+            href="#install"
+            className="mt-4 inline-flex text-[13px] font-semibold text-[var(--text-muted)] underline-offset-4 hover:text-[var(--text)] hover:underline"
+          >
+            choose another installer
+          </a>
         </div>
       </FadeIn>
     </Section>
   );
 }
 
-// ----------------------------------------------------------------------------
-// FOOTER
-// ----------------------------------------------------------------------------
 function Footer() {
   return (
-    <footer className="relative border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_92%,var(--surface-1))]">
-      <div className="mx-auto px-6 py-12 md:px-10 md:py-16" style={{ maxWidth: "var(--shell)" }}>
-        <div className="grid gap-10 md:grid-cols-[1fr_2fr]">
-          <div>
-            <div className="text-[14px] font-semibold tracking-[-0.01em] text-[var(--text)]">Bonjou</div>
-            <p className="mt-4 max-w-[28ch] text-[13px] leading-[1.6] text-[var(--text-muted)]">
+    <footer className="relative z-10 border-t border-[var(--border)] bg-[var(--bg-soft)]">
+      <div className="mx-auto px-4 py-12 sm:px-6 md:py-14 lg:px-0" style={{ maxWidth: "var(--shell)" }}>
+        <div className="grid min-w-0 gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <div className="min-w-0">
+            <div className="font-[var(--font-display)] text-[16px] font-bold tracking-[-0.02em] text-[var(--text)]">Bonjou</div>
+            <p className="mt-4 max-w-[32ch] text-[14px] leading-[1.6] text-[var(--text-muted)]">
               A local-network chat and file-transfer CLI. Built in Go. Released under MIT.
             </p>
             <div className="mt-5">
@@ -967,28 +831,52 @@ function Footer() {
             />
           </div>
         </div>
-        <Divider className="my-10" />
-        <div className="flex flex-col items-start justify-between gap-3 text-[12px] text-[var(--text-dim)] md:flex-row md:items-center">
-          <div className="font-mono">© {new Date().getFullYear()} Bonjou · MIT licensed</div>
-          <div className="font-mono">v1.2.0 · made for the local subnet</div>
+        <Divider className="my-9" />
+        <div className="flex flex-col items-start justify-between gap-3 font-mono text-[12px] text-[var(--text-dim)] md:flex-row md:items-center">
+          <div>© {new Date().getFullYear()} Bonjou · MIT licensed</div>
+          <div>v1.2.0 · made for the local subnet</div>
         </div>
       </div>
     </footer>
   );
 }
 
-function FooterCol({
-  heading,
-  links,
+function SectionHeading({
+  index,
+  label,
+  title,
+  body,
+  children,
+  compact = false,
 }: {
-  heading: string;
-  links: { label: string; href: string }[];
+  index: string;
+  label: string;
+  title: string;
+  body?: string;
+  children?: React.ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div>
-      <div className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.22em] text-[var(--text-dim)]">
-        {heading}
+    <FadeIn className={cn("min-w-0", compact ? "max-w-xl" : "max-w-2xl")}>
+      <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+        <span className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--accent)]">{index}</span>
+        <div className="min-w-0">
+          <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{label}</div>
+          <h2 className="mt-4 text-[clamp(2rem,4vw,3.1rem)] font-bold leading-[1.02] tracking-[-0.04em] text-[var(--text)]">
+            {title}
+          </h2>
+          {body && <p className="mt-5 max-w-[62ch] text-[16px] leading-[1.65] text-[var(--text-muted)]">{body}</p>}
+          {children}
+        </div>
       </div>
+    </FadeIn>
+  );
+}
+
+function FooterCol({ heading, links }: { heading: string; links: { label: string; href: string }[] }) {
+  return (
+    <div>
+      <div className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{heading}</div>
       <ul className="space-y-2">
         {links.map((l) => (
           <li key={l.label}>
@@ -996,7 +884,7 @@ function FooterCol({
               href={l.href}
               target={l.href.startsWith("http") ? "_blank" : undefined}
               rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
-              className="text-[13px] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+              className="text-[14px] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
             >
               {l.label}
             </a>
@@ -1007,9 +895,6 @@ function FooterCol({
   );
 }
 
-// ----------------------------------------------------------------------------
-// ICONS
-// ----------------------------------------------------------------------------
 function GithubIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
