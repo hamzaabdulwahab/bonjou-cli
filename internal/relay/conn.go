@@ -33,7 +33,9 @@ type Conn struct {
 	rv   *Rendezvous
 	ip   string
 	peer *Peer
-	room *Room
+
+	netRoom  *Room
+	codeRoom *Room
 }
 
 func newConn(ws *websocket.Conn, hub *Hub, rv *Rendezvous, ip string) (*Conn, error) {
@@ -102,6 +104,8 @@ func (c *Conn) writePump(ctx context.Context) {
 
 func (c *Conn) handle(msg *clientMessage) error {
 	switch msg.Type {
+	case msgHello:
+		return c.handleHello(msg)
 	case msgCreate:
 		return c.handleCreate(msg)
 	case msgJoin:
@@ -117,8 +121,44 @@ func (c *Conn) handle(msg *clientMessage) error {
 	}
 }
 
+// handleHello is the entry point every client uses. It establishes the
+// peer's identity and places it in the room shared by everyone reaching
+// the relay from the same public address — the browser's stand-in for the
+// LAN broadcast the CLI uses, which no browser can send.
+//
+// Being unable to group by network is not an error the user can act on:
+// they still get a working page, just without automatic neighbours, so it
+// resolves to an empty roster with a reason rather than a failure.
+func (c *Conn) handleHello(msg *clientMessage) error {
+	if c.peer.Name == "" {
+		if err := c.adoptIdentity(msg); err != nil {
+			return err
+		}
+	}
+	if c.netRoom != nil {
+		c.peer.Send(rosterFor(c.peer))
+		return nil
+	}
+
+	room, err := c.hub.NetworkRoom(c.ip)
+	if err != nil {
+		c.peer.Send(&serverMessage{Type: msgJoined, PeerID: c.peer.ID})
+		c.peer.Send(errorMessage(codeForError(err), err.Error()))
+		return nil
+	}
+	if err := room.Add(c.peer); err != nil {
+		c.peer.Send(&serverMessage{Type: msgJoined, PeerID: c.peer.ID})
+		c.peer.Send(errorMessage(codeForError(err), err.Error()))
+		return nil
+	}
+	c.netRoom = room
+	c.peer.Send(&serverMessage{Type: msgJoined, PeerID: c.peer.ID})
+	room.NotifyRosters()
+	return nil
+}
+
 func (c *Conn) handleCreate(msg *clientMessage) error {
-	if c.room != nil {
+	if c.codeRoom != nil {
 		return errAlreadyInRoom
 	}
 	if err := c.adoptIdentity(msg); err != nil {
@@ -129,18 +169,18 @@ func (c *Conn) handleCreate(msg *clientMessage) error {
 		return err
 	}
 	if err := room.Add(c.peer); err != nil {
-		c.hub.Drop(room.Code)
+		c.hub.Drop(room.Key)
 		return err
 	}
-	c.room = room
+	c.codeRoom = room
 	c.peer.Send(&serverMessage{Type: msgCreated, Code: room.Code, PeerID: c.peer.ID})
-	room.BroadcastRoster()
+	c.notifyEveryone()
 	c.hub.logf("relay: room %s created by %s", room.Code, c.peer.ID)
 	return nil
 }
 
 func (c *Conn) handleJoin(msg *clientMessage) error {
-	if c.room != nil {
+	if c.codeRoom != nil {
 		return errAlreadyInRoom
 	}
 	if err := c.adoptIdentity(msg); err != nil {
@@ -153,27 +193,29 @@ func (c *Conn) handleJoin(msg *clientMessage) error {
 	if err := room.Add(c.peer); err != nil {
 		return err
 	}
-	c.room = room
+	c.codeRoom = room
 	c.peer.Send(&serverMessage{Type: msgJoined, Code: room.Code, PeerID: c.peer.ID})
-	room.BroadcastRoster()
+	c.notifyEveryone()
 	return nil
 }
 
 // handleRelay forwards an end-to-end encrypted frame. The relay reads the
 // destination and nothing else: Payload is ciphertext it has no key for.
+// Sending to several people at once is the client's job — it seals one
+// frame per recipient, because a shared secret is per-pair.
 func (c *Conn) handleRelay(msg *clientMessage) error {
-	if c.room == nil {
+	if c.peer.Name == "" {
 		return errNotInRoom
 	}
 	if msg.Payload == "" {
 		return errors.New("relay frame has empty payload")
 	}
-	target, ok := c.room.Peer(msg.To)
+	target, ok := c.peer.Find(msg.To)
 	if !ok {
 		return errPeerNotFound
 	}
 	target.Send(&serverMessage{Type: msgRelay, From: c.peer.ID, Payload: msg.Payload})
-	c.room.Touch()
+	c.touchRooms()
 	return nil
 }
 
@@ -184,10 +226,10 @@ func (c *Conn) handleRelay(msg *clientMessage) error {
 // enforced on the receiving browser, which will not open the download
 // until its own user has approved.
 func (c *Conn) handleTransferBegin(msg *clientMessage) error {
-	if c.room == nil {
+	if c.peer.Name == "" {
 		return errNotInRoom
 	}
-	target, ok := c.room.Peer(msg.To)
+	target, ok := c.peer.Find(msg.To)
 	if !ok {
 		return errPeerNotFound
 	}
@@ -211,7 +253,7 @@ func (c *Conn) handleTransferBegin(msg *clientMessage) error {
 		Peer:       c.peer.ID,
 		Size:       x.size,
 	})
-	c.room.Touch()
+	c.touchRooms()
 	return nil
 }
 
@@ -220,14 +262,11 @@ func (c *Conn) handleTransferBegin(msg *clientMessage) error {
 // who changes their mind mid-transfer stops it immediately rather than
 // after the idle timeout.
 func (c *Conn) handleTransferEnd(msg *clientMessage) error {
-	if c.room == nil {
-		return errNotInRoom
-	}
 	if msg.TransferID == "" {
 		return errors.New("transfer_end requires transfer_id")
 	}
 	c.rv.Abort(msg.TransferID, fmt.Errorf("cancelled by peer: %s", msg.Status))
-	if target, ok := c.room.Peer(msg.To); ok {
+	if target, ok := c.peer.Find(msg.To); ok {
 		target.Send(&serverMessage{
 			Type:       msgTransferEnd,
 			TransferID: msg.TransferID,
@@ -235,12 +274,12 @@ func (c *Conn) handleTransferEnd(msg *clientMessage) error {
 			From:       c.peer.ID,
 		})
 	}
-	c.room.Touch()
+	c.touchRooms()
 	return nil
 }
 
 // adoptIdentity validates and records the display name and ephemeral
-// public key a client presents when entering a room.
+// public key a client presents when it arrives.
 func (c *Conn) adoptIdentity(msg *clientMessage) error {
 	name := sanitizeName(msg.Name)
 	if name == "" {
@@ -257,22 +296,46 @@ func (c *Conn) adoptIdentity(msg *clientMessage) error {
 	return nil
 }
 
+// notifyEveryone refreshes the roster for every peer who can see this one.
+func (c *Conn) notifyEveryone() {
+	if c.netRoom != nil {
+		c.netRoom.NotifyRosters()
+	}
+	if c.codeRoom != nil {
+		c.codeRoom.NotifyRosters()
+	}
+}
+
+func (c *Conn) touchRooms() {
+	if c.netRoom != nil {
+		c.netRoom.Touch()
+	}
+	if c.codeRoom != nil {
+		c.codeRoom.Touch()
+	}
+}
+
 func (c *Conn) cleanup() {
 	c.peer.Close()
 	for _, id := range c.rv.AbortForPeer(c.peer.ID, errors.New("peer disconnected")) {
 		c.hub.logf("relay: aborted transfer %s (peer %s left)", id, c.peer.ID)
 	}
-	if c.room == nil {
-		return
+
+	for _, room := range []*Room{c.netRoom, c.codeRoom} {
+		if room == nil {
+			continue
+		}
+		empty := room.Remove(c.peer)
+		if empty {
+			c.hub.Drop(room.Key)
+			if room.Kind == roomKindCode {
+				c.hub.logf("relay: room %s closed (last peer left)", room.Code)
+			}
+			continue
+		}
+		room.Broadcast(&serverMessage{Type: msgPeerLeft, PeerID: c.peer.ID})
+		room.NotifyRosters()
 	}
-	empty := c.room.Remove(c.peer.ID)
-	if empty {
-		c.hub.Drop(c.room.Code)
-		c.hub.logf("relay: room %s closed (last peer left)", c.room.Code)
-		return
-	}
-	c.room.Broadcast(&serverMessage{Type: msgPeerLeft, PeerID: c.peer.ID})
-	c.room.BroadcastRoster()
 }
 
 // sanitizeName strips control characters and clamps length so one client
@@ -298,6 +361,8 @@ func codeForError(err error) string {
 		return errCodeNoRoom
 	case errors.Is(err, errRoomFull):
 		return errCodeRoomFull
+	case errors.Is(err, errNetworkBusy):
+		return errCodeNetworkBusy
 	case errors.Is(err, errPeerNotFound):
 		return errCodeNoPeer
 	case errors.Is(err, errRateLimited):

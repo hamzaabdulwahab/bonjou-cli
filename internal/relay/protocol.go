@@ -13,6 +13,7 @@ package relay
 // fields of each frame; anything in Payload is ciphertext it cannot open.
 const (
 	// Client to server.
+	msgHello         = "hello"
 	msgCreate        = "create"
 	msgJoin          = "join"
 	msgRelay         = "relay"
@@ -46,6 +47,7 @@ const (
 	errCodeCapacity      = "capacity"
 	errCodeAlreadyInRoom = "already_in_room"
 	errCodeNotInRoom     = "not_in_room"
+	errCodeNetworkBusy   = "network_busy"
 )
 
 // clientMessage is an inbound control frame. Fields are optional per kind;
@@ -105,6 +107,11 @@ type peerInfo struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	PubKey string `json:"pubkey"`
+	// Source is "network" for peers found on the same public address and
+	// "code" for peers who entered a shared code, so the UI can say where
+	// somebody came from instead of presenting strangers and invitees
+	// identically.
+	Source string `json:"source"`
 }
 
 func errorMessage(code, message string) *serverMessage {

@@ -61,7 +61,7 @@ func TestRoomRejectsPeersBeyondLimit(t *testing.T) {
 }
 
 func TestRoomRemoveReportsEmpty(t *testing.T) {
-	room := newRoom("7K2-9QX", 8)
+	room := newRoom("7K2-9QX", "7K2-9QX", roomKindCode, 8)
 	a, b := newPeer("a", "A", ""), newPeer("b", "B", "")
 	if err := room.Add(a); err != nil {
 		t.Fatalf("Add a: %v", err)
@@ -69,32 +69,173 @@ func TestRoomRemoveReportsEmpty(t *testing.T) {
 	if err := room.Add(b); err != nil {
 		t.Fatalf("Add b: %v", err)
 	}
-	if empty := room.Remove("a"); empty {
+	if empty := room.Remove(a); empty {
 		t.Fatal("room reported empty while one peer remains")
 	}
-	if empty := room.Remove("b"); !empty {
+	if empty := room.Remove(b); !empty {
 		t.Fatal("room did not report empty after last peer left")
 	}
 }
 
-func TestRoomRosterReflectsMembers(t *testing.T) {
-	room := newRoom("7K2-9QX", 8)
-	if err := room.Add(newPeer("a", "Ada", "aa")); err != nil {
-		t.Fatalf("Add: %v", err)
+// A peer sees everyone else in the room, never itself.
+func TestReachableExcludesSelf(t *testing.T) {
+	room := newRoom("7K2-9QX", "7K2-9QX", roomKindCode, 8)
+	ada, bo := newPeer("a", "Ada", "aa"), newPeer("b", "Bo", "bb")
+	for _, p := range []*Peer{ada, bo} {
+		if err := room.Add(p); err != nil {
+			t.Fatalf("Add: %v", err)
+		}
 	}
-	if err := room.Add(newPeer("b", "Bo", "bb")); err != nil {
-		t.Fatalf("Add: %v", err)
+	reachable := ada.Reachable()
+	if len(reachable) != 1 {
+		t.Fatalf("Ada sees %d peers, want 1", len(reachable))
 	}
-	roster := room.Roster()
-	if len(roster) != 2 {
-		t.Fatalf("roster size = %d, want 2", len(roster))
+	if reachable[0].ID != "b" || reachable[0].Name != "Bo" {
+		t.Fatalf("Ada sees %+v, want Bo", reachable[0])
 	}
-	names := map[string]string{}
-	for _, p := range roster {
-		names[p.ID] = p.Name
+	if reachable[0].Source != roomKindCode {
+		t.Fatalf("source = %q, want %q", reachable[0].Source, roomKindCode)
 	}
-	if names["a"] != "Ada" || names["b"] != "Bo" {
-		t.Fatalf("roster = %+v, want Ada and Bo", roster)
+}
+
+// The union is the point: someone on your Wi-Fi and someone who used your
+// link are both reachable, and each is labelled with where they came from.
+func TestReachableUnionsNetworkAndCodeRooms(t *testing.T) {
+	net := newRoom("net:abc", "", roomKindNetwork, 12)
+	code := newRoom("7K2-9QX", "7K2-9QX", roomKindCode, 8)
+
+	me := newPeer("me", "Me", "00")
+	neighbour := newPeer("n", "Neighbour", "11")
+	invitee := newPeer("i", "Invitee", "22")
+
+	for _, p := range []*Peer{me, neighbour} {
+		if err := net.Add(p); err != nil {
+			t.Fatalf("net Add: %v", err)
+		}
+	}
+	for _, p := range []*Peer{me, invitee} {
+		if err := code.Add(p); err != nil {
+			t.Fatalf("code Add: %v", err)
+		}
+	}
+
+	sources := map[string]string{}
+	for _, info := range me.Reachable() {
+		sources[info.ID] = info.Source
+	}
+	if len(sources) != 2 {
+		t.Fatalf("reachable = %v, want two peers", sources)
+	}
+	if sources["n"] != roomKindNetwork {
+		t.Errorf("neighbour source = %q, want %q", sources["n"], roomKindNetwork)
+	}
+	if sources["i"] != roomKindCode {
+		t.Errorf("invitee source = %q, want %q", sources["i"], roomKindCode)
+	}
+
+	// Reachability is what authorises addressing someone at all.
+	if _, ok := me.Find("n"); !ok {
+		t.Error("neighbour not addressable")
+	}
+	if _, ok := me.Find("me"); ok {
+		t.Error("a peer must not be able to address itself")
+	}
+	if _, ok := neighbour.Find("i"); ok {
+		t.Error("a network peer must not reach into an unrelated code room")
+	}
+}
+
+// Someone visible through both rooms is listed once, labelled by the
+// stronger signal of intent.
+func TestReachableDeduplicatesAcrossRooms(t *testing.T) {
+	net := newRoom("net:abc", "", roomKindNetwork, 12)
+	code := newRoom("7K2-9QX", "7K2-9QX", roomKindCode, 8)
+	me, both := newPeer("me", "Me", "00"), newPeer("b", "Both", "11")
+	for _, room := range []*Room{net, code} {
+		for _, p := range []*Peer{me, both} {
+			if err := room.Add(p); err != nil {
+				t.Fatalf("Add: %v", err)
+			}
+		}
+	}
+	reachable := me.Reachable()
+	if len(reachable) != 1 {
+		t.Fatalf("reachable = %+v, want one entry", reachable)
+	}
+	if reachable[0].Source != roomKindCode {
+		t.Errorf("source = %q, want %q (code is the stronger signal)", reachable[0].Source, roomKindCode)
+	}
+}
+
+// Carrier-grade NAT can put hundreds of unrelated people behind one
+// address. Past the cap the relay must stop grouping rather than
+// introduce strangers to each other.
+func TestNetworkRoomStopsGroupingPastCap(t *testing.T) {
+	limits := DefaultLimits()
+	limits.MaxNetworkPeers = 2
+	h := NewHub(limits, nil)
+
+	room, err := h.NetworkRoom("203.0.113.9")
+	if err != nil {
+		t.Fatalf("NetworkRoom: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := room.Add(newPeer(strconv.Itoa(i), "peer", "")); err != nil {
+			t.Fatalf("Add %d: %v", i, err)
+		}
+	}
+	if err := room.Add(newPeer("overflow", "peer", "")); !errors.Is(err, errNetworkBusy) {
+		t.Fatalf("Add past cap = %v, want errNetworkBusy", err)
+	}
+}
+
+// Same address means same room; a different address must not.
+func TestNetworkRoomGroupsByAddress(t *testing.T) {
+	h := NewHub(DefaultLimits(), nil)
+	a, err := h.NetworkRoom("203.0.113.9")
+	if err != nil {
+		t.Fatalf("NetworkRoom: %v", err)
+	}
+	again, err := h.NetworkRoom("203.0.113.9")
+	if err != nil {
+		t.Fatalf("NetworkRoom: %v", err)
+	}
+	if a != again {
+		t.Fatal("the same address produced two different rooms")
+	}
+	other, err := h.NetworkRoom("198.51.100.4")
+	if err != nil {
+		t.Fatalf("NetworkRoom: %v", err)
+	}
+	if a == other {
+		t.Fatal("different addresses were grouped together")
+	}
+}
+
+// The room table must not double as a list of who is online from where.
+func TestNetworkKeyDoesNotLeakAddress(t *testing.T) {
+	h := NewHub(DefaultLimits(), nil)
+	key := h.networkKey("203.0.113.9")
+	if strings.Contains(key, "203.0.113.9") {
+		t.Fatalf("network key %q contains the raw address", key)
+	}
+	// A second hub uses a fresh salt, so digests are not comparable
+	// across restarts either.
+	if other := NewHub(DefaultLimits(), nil).networkKey("203.0.113.9"); other == key {
+		t.Fatal("network keys are stable across hubs; the salt is not doing its job")
+	}
+}
+
+// A code room must not be reachable through the network-room lookup, or a
+// guessed digest would open someone else's private room.
+func TestRoomLookupRejectsNetworkRooms(t *testing.T) {
+	h := NewHub(DefaultLimits(), nil)
+	room, err := h.NetworkRoom("203.0.113.9")
+	if err != nil {
+		t.Fatalf("NetworkRoom: %v", err)
+	}
+	if _, err := h.Room(room.Key); !errors.Is(err, errRoomNotFound) {
+		t.Fatalf("network room resolved by code lookup: %v", err)
 	}
 }
 
@@ -111,23 +252,21 @@ func TestHubSweepExpiresIdleRooms(t *testing.T) {
 		t.Fatalf("Add: %v", err)
 	}
 
-	// Not yet idle enough.
+	// An occupied room is never swept, however quiet it has been. Someone
+	// waiting in a room for a slow friend must not have it vanish.
+	h.sweep(time.Now().Add(2 * time.Minute))
+	if h.Rooms() != 1 {
+		t.Fatalf("occupied room was swept; Rooms() = %d, want 1", h.Rooms())
+	}
+
+	room.Remove(peer)
 	h.sweep(time.Now())
 	if h.Rooms() != 1 {
 		t.Fatalf("room expired early; Rooms() = %d, want 1", h.Rooms())
 	}
-
 	h.sweep(time.Now().Add(2 * time.Minute))
 	if h.Rooms() != 0 {
-		t.Fatalf("idle room survived sweep; Rooms() = %d, want 0", h.Rooms())
-	}
-	select {
-	case msg := <-peer.send:
-		if msg.Type != msgError || msg.ErrCode != errCodeNoRoom {
-			t.Fatalf("expiry notice = %+v, want error/no_room", msg)
-		}
-	default:
-		t.Fatal("peer was not told the room expired")
+		t.Fatalf("idle empty room survived sweep; Rooms() = %d, want 0", h.Rooms())
 	}
 }
 
@@ -276,6 +415,7 @@ func TestCodeForError(t *testing.T) {
 	}{
 		{errRoomNotFound, errCodeNoRoom},
 		{errRoomFull, errCodeRoomFull},
+		{errNetworkBusy, errCodeNetworkBusy},
 		{errPeerNotFound, errCodeNoPeer},
 		{errRateLimited, errCodeRateLimited},
 		{errAtCapacity, errCodeCapacity},

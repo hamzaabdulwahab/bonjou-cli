@@ -2,6 +2,9 @@ package relay
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"sync"
 	"time"
@@ -13,10 +16,11 @@ var (
 	errRoomNotFound  = errors.New("no room with that code — it may have expired")
 	errRoomFull      = errors.New("room is full")
 	errAtCapacity    = errors.New("relay is at capacity, try again shortly")
-	errPeerNotFound  = errors.New("that peer is no longer in the room")
+	errPeerNotFound  = errors.New("that peer is no longer reachable")
 	errRateLimited   = errors.New("too many rooms created from this address")
 	errAlreadyInRoom = errors.New("this connection is already in a room")
-	errNotInRoom     = errors.New("join a room first")
+	errNotInRoom     = errors.New("say hello first")
+	errNetworkBusy   = errors.New("too many devices share this network address to group them safely")
 )
 
 // peerSendBuffer is how many control frames may queue for one client
@@ -26,7 +30,15 @@ var (
 // growing a queue forever.
 const peerSendBuffer = 64
 
-// Peer is one connected browser inside a room.
+// Room kinds. A network room is joined automatically by everyone sharing
+// a public address; a code room is entered deliberately via a short code.
+const (
+	roomKindNetwork = "network"
+	roomKindCode    = "code"
+)
+
+// Peer is one connected browser. A peer belongs to its network room and,
+// optionally, to a code room; what it can see is the union of both.
 type Peer struct {
 	ID     string
 	Name   string
@@ -35,6 +47,9 @@ type Peer struct {
 	send     chan *serverMessage
 	closed   chan struct{}
 	closeOne sync.Once
+
+	mu    sync.RWMutex
+	rooms map[string]*Room
 }
 
 func newPeer(id, name, pubKey string) *Peer {
@@ -44,6 +59,7 @@ func newPeer(id, name, pubKey string) *Peer {
 		PubKey: pubKey,
 		send:   make(chan *serverMessage, peerSendBuffer),
 		closed: make(chan struct{}),
+		rooms:  make(map[string]*Room),
 	}
 }
 
@@ -68,13 +84,88 @@ func (p *Peer) Close() {
 	p.closeOne.Do(func() { close(p.closed) })
 }
 
-func (p *Peer) info() peerInfo {
-	return peerInfo{ID: p.ID, Name: p.Name, PubKey: p.PubKey}
+func (p *Peer) info(source string) peerInfo {
+	return peerInfo{ID: p.ID, Name: p.Name, PubKey: p.PubKey, Source: source}
 }
 
-// Room is a rendezvous group addressed by a short human-readable code.
+func (p *Peer) joinedRoom(r *Room) {
+	p.mu.Lock()
+	p.rooms[r.Key] = r
+	p.mu.Unlock()
+}
+
+func (p *Peer) leftRoom(r *Room) {
+	p.mu.Lock()
+	delete(p.rooms, r.Key)
+	p.mu.Unlock()
+}
+
+func (p *Peer) roomList() []*Room {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	out := make([]*Room, 0, len(p.rooms))
+	for _, r := range p.rooms {
+		out = append(out, r)
+	}
+	return out
+}
+
+// CodeRoom returns the peer's code room, if it is in one.
+func (p *Peer) CodeRoom() *Room {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	for _, r := range p.rooms {
+		if r.Kind == roomKindCode {
+			return r
+		}
+	}
+	return nil
+}
+
+// Reachable reports every peer this one may address: everyone in any room
+// it shares, itself excluded. A peer discovered on the local network and
+// a peer who arrived by code are equally reachable; only the label
+// differs, so the UI can explain where someone came from.
+func (p *Peer) Reachable() []peerInfo {
+	seen := make(map[string]peerInfo)
+	for _, room := range p.roomList() {
+		for _, other := range room.members() {
+			if other.ID == p.ID {
+				continue
+			}
+			// A code room is the stronger statement about intent, so it
+			// wins the label when someone is visible through both.
+			if existing, ok := seen[other.ID]; ok && existing.Source == roomKindCode {
+				continue
+			}
+			seen[other.ID] = other.info(room.Kind)
+		}
+	}
+	out := make([]peerInfo, 0, len(seen))
+	for _, info := range seen {
+		out = append(out, info)
+	}
+	return out
+}
+
+// Find resolves a peer this one is allowed to address.
+func (p *Peer) Find(id string) (*Peer, bool) {
+	for _, room := range p.roomList() {
+		if other, ok := room.Peer(id); ok && other.ID != p.ID {
+			return other, true
+		}
+	}
+	return nil, false
+}
+
+// Room is a set of peers who can see each other.
 type Room struct {
+	// Key is the internal identifier. For code rooms it is the code; for
+	// network rooms it is an opaque digest of the public address, so a
+	// raw IP is never stored or exposed.
+	Key  string
 	Code string
+	Kind string
 
 	mu         sync.RWMutex
 	peers      map[string]*Peer
@@ -82,34 +173,43 @@ type Room struct {
 	maxPeers   int
 }
 
-func newRoom(code string, maxPeers int) *Room {
+func newRoom(key, code, kind string, maxPeers int) *Room {
 	return &Room{
+		Key:        key,
 		Code:       code,
+		Kind:       kind,
 		peers:      make(map[string]*Peer),
 		lastActive: time.Now(),
 		maxPeers:   maxPeers,
 	}
 }
 
-// Add places a peer in the room and returns the resulting roster.
+// Add places a peer in the room.
 func (r *Room) Add(p *Peer) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if len(r.peers) >= r.maxPeers {
+		r.mu.Unlock()
+		if r.Kind == roomKindNetwork {
+			return errNetworkBusy
+		}
 		return errRoomFull
 	}
 	r.peers[p.ID] = p
 	r.lastActive = time.Now()
+	r.mu.Unlock()
+	p.joinedRoom(r)
 	return nil
 }
 
 // Remove drops a peer and reports whether the room is now empty.
-func (r *Room) Remove(id string) (empty bool) {
+func (r *Room) Remove(p *Peer) (empty bool) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.peers, id)
+	delete(r.peers, p.ID)
 	r.lastActive = time.Now()
-	return len(r.peers) == 0
+	empty = len(r.peers) == 0
+	r.mu.Unlock()
+	p.leftRoom(r)
+	return empty
 }
 
 // Peer looks up one member.
@@ -120,35 +220,38 @@ func (r *Room) Peer(id string) (*Peer, bool) {
 	return p, ok
 }
 
-// Roster snapshots the current membership.
-func (r *Room) Roster() []peerInfo {
+func (r *Room) members() []*Peer {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	out := make([]peerInfo, 0, len(r.peers))
+	out := make([]*Peer, 0, len(r.peers))
 	for _, p := range r.peers {
-		out = append(out, p.info())
+		out = append(out, p)
 	}
 	return out
 }
 
 // Broadcast delivers a frame to every member.
 func (r *Room) Broadcast(msg *serverMessage) {
-	r.mu.RLock()
-	targets := make([]*Peer, 0, len(r.peers))
-	for _, p := range r.peers {
-		targets = append(targets, p)
-	}
-	r.mu.RUnlock()
-	for _, p := range targets {
+	for _, p := range r.members() {
 		p.Send(msg)
 	}
 }
 
-// BroadcastRoster pushes the current membership to everyone. Called after
-// any join or leave so each client can render who is present without
-// polling.
-func (r *Room) BroadcastRoster() {
-	r.Broadcast(&serverMessage{Type: msgRoster, Code: r.Code, Peers: r.Roster()})
+// NotifyRosters pushes each member its own view. Rosters are per-peer
+// rather than per-room because two peers in the same room can see
+// different people: one may also be in a code room the other is not.
+func (r *Room) NotifyRosters() {
+	for _, p := range r.members() {
+		p.Send(rosterFor(p))
+	}
+}
+
+func rosterFor(p *Peer) *serverMessage {
+	msg := &serverMessage{Type: msgRoster, Peers: p.Reachable()}
+	if code := p.CodeRoom(); code != nil {
+		msg.Code = code.Code
+	}
+	return msg
 }
 
 // Touch marks the room as active, deferring its idle expiry.
@@ -179,20 +282,65 @@ type Hub struct {
 	limits Limits
 	logger *logger.Logger
 	rl     *rateLimiter
+
+	// networkSalt keeps address digests unlinkable across relay restarts
+	// and useless to anyone who obtains one.
+	networkSalt []byte
 }
 
 // NewHub constructs a hub. A nil logger is allowed; log calls become no-ops.
 func NewHub(limits Limits, lg *logger.Logger) *Hub {
 	limits = limits.withDefaults()
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		// Without a salt, address digests would be guessable. Fall back to
+		// a time-derived value rather than an empty one.
+		salt = []byte(time.Now().String())
+	}
 	return &Hub{
-		rooms:  make(map[string]*Room),
-		limits: limits,
-		logger: lg,
-		rl:     newRateLimiter(limits.CreatePerIPPerMin),
+		rooms:       make(map[string]*Room),
+		limits:      limits,
+		logger:      lg,
+		rl:          newRateLimiter(limits.CreatePerIPPerMin),
+		networkSalt: salt,
 	}
 }
 
-// CreateRoom allocates a room with a fresh code. Codes are retried on the
+// networkKey digests a client address. The raw address never becomes a
+// map key, so the room table cannot be read back as a list of who is
+// online from where.
+func (h *Hub) networkKey(ip string) string {
+	sum := sha256.Sum256(append(h.networkSalt, []byte(ip)...))
+	return "net:" + hex.EncodeToString(sum[:8])
+}
+
+// NetworkRoom returns the room shared by everyone reaching the relay from
+// the same public address — the browser's substitute for the CLI's UDP
+// broadcast, which no browser can send.
+//
+// The grouping is only as good as the address. Devices on one Wi-Fi
+// network share a public address, which is the case this serves. But so
+// do devices behind carrier-grade NAT, where "same address" means
+// "same ISP region" rather than "same room". MaxNetworkPeers bounds that:
+// past the cap the relay stops grouping rather than introducing strangers
+// to each other.
+func (h *Hub) NetworkRoom(ip string) (*Room, error) {
+	key := h.networkKey(ip)
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if room, ok := h.rooms[key]; ok {
+		return room, nil
+	}
+	if len(h.rooms) >= h.limits.MaxRooms {
+		return nil, errAtCapacity
+	}
+	room := newRoom(key, "", roomKindNetwork, h.limits.MaxNetworkPeers)
+	h.rooms[key] = room
+	return room, nil
+}
+
+// CreateRoom allocates a code room. Codes are retried on the
 // astronomically unlikely event of a collision rather than trusting
 // randomness blindly.
 func (h *Hub) CreateRoom(ip string) (*Room, error) {
@@ -212,7 +360,7 @@ func (h *Hub) CreateRoom(ip string) (*Room, error) {
 		if _, taken := h.rooms[code]; taken {
 			continue
 		}
-		room := newRoom(code, h.limits.MaxPeersPerRoom)
+		room := newRoom(code, code, roomKindCode, h.limits.MaxPeersPerRoom)
 		h.rooms[code] = room
 		return room, nil
 	}
@@ -228,17 +376,17 @@ func (h *Hub) Room(code string) (*Room, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	room, ok := h.rooms[normalized]
-	if !ok {
+	if !ok || room.Kind != roomKindCode {
 		return nil, errRoomNotFound
 	}
 	return room, nil
 }
 
 // Drop removes a room, used when its last peer leaves.
-func (h *Hub) Drop(code string) {
+func (h *Hub) Drop(key string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.rooms, code)
+	delete(h.rooms, key)
 }
 
 // Rooms reports the current room count, for the health endpoint.
@@ -266,18 +414,17 @@ func (h *Hub) Run(ctx context.Context) {
 func (h *Hub) sweep(now time.Time) {
 	h.mu.Lock()
 	stale := make([]*Room, 0)
-	for code, room := range h.rooms {
-		if now.Sub(room.idleSince()) < h.limits.RoomIdleTTL {
+	for key, room := range h.rooms {
+		if room.size() > 0 || now.Sub(room.idleSince()) < h.limits.RoomIdleTTL {
 			continue
 		}
 		stale = append(stale, room)
-		delete(h.rooms, code)
+		delete(h.rooms, key)
 	}
 	h.mu.Unlock()
 
 	for _, room := range stale {
-		room.Broadcast(errorMessage(errCodeNoRoom, "room expired after inactivity"))
-		h.logf("relay: expired idle room %s (%d peers)", room.Code, room.size())
+		h.logf("relay: expired idle room %s", room.Key)
 	}
 }
 

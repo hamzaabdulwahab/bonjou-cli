@@ -21,6 +21,13 @@ export interface Peer {
   id: string;
   name: string;
   pubkey: string;
+  /**
+   * Where this peer came from: "network" means the relay saw them arrive
+   * from the same public address as you, "code" means they entered a
+   * shared code. The distinction matters — a code is a deliberate
+   * invitation, a shared address is only a hint.
+   */
+  source: "network" | "code";
 }
 
 export type ConnectionStatus =
@@ -79,6 +86,7 @@ export class RelayClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByUser = false;
   /** Set once the room is known, so a reconnect can rejoin it. */
+  private saidHello = false;
   private pendingIntent: { action: "create" | "join"; code?: string } | null =
     null;
 
@@ -122,6 +130,7 @@ export class RelayClient {
       this.reconnectAttempt = 0;
       this.emit({ type: "status", status: "connected" });
       // A reconnect lands in a fresh relay session, so re-announce.
+      if (this.saidHello) this.sendHello();
       if (this.pendingIntent?.action === "create") this.sendCreate();
       else if (this.pendingIntent?.action === "join" && this.pendingIntent.code)
         this.sendJoin(this.pendingIntent.code);
@@ -172,6 +181,24 @@ export class RelayClient {
   private send(frame: Record<string, unknown>): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return;
     this.socket.send(JSON.stringify(frame));
+  }
+
+  /**
+   * Announces this browser and joins the room shared by everyone on the
+   * same public address. It is the browser's stand-in for the CLI's UDP
+   * broadcast, which no browser is allowed to send.
+   */
+  hello(): void {
+    this.saidHello = true;
+    this.sendHello();
+  }
+
+  private sendHello(): void {
+    this.send({
+      type: "hello",
+      name: this.displayName,
+      pubkey: toHex(this.identity.publicKey),
+    });
   }
 
   createRoom(): void {

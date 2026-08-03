@@ -14,6 +14,12 @@ type Limits struct {
 	// MaxPeersPerRoom caps roster size. Small on purpose: a share room is
 	// two or three devices, not a chat channel.
 	MaxPeersPerRoom int
+	// MaxNetworkPeers caps an auto-grouped network room. One Wi-Fi network
+	// holds a handful of devices; a much larger group means the shared
+	// public address is carrier-grade NAT, where "same address" does not
+	// mean "same room". Past the cap the relay stops grouping rather than
+	// introducing strangers to each other.
+	MaxNetworkPeers int
 	// RoomIdleTTL is how long a room survives with no traffic.
 	RoomIdleTTL time.Duration
 	// CreatePerIPPerMin throttles room creation per source address.
@@ -39,6 +45,7 @@ func DefaultLimits() Limits {
 	return Limits{
 		MaxRooms:               5000,
 		MaxPeersPerRoom:        8,
+		MaxNetworkPeers:        12,
 		RoomIdleTTL:            30 * time.Minute,
 		CreatePerIPPerMin:      20,
 		MaxTransferBytes:       16 << 30, // 16 GiB, matching config.MaxIncomingBytes
@@ -56,6 +63,9 @@ func (l Limits) withDefaults() Limits {
 	}
 	if l.MaxPeersPerRoom <= 0 {
 		l.MaxPeersPerRoom = d.MaxPeersPerRoom
+	}
+	if l.MaxNetworkPeers <= 0 {
+		l.MaxNetworkPeers = d.MaxNetworkPeers
 	}
 	if l.RoomIdleTTL <= 0 {
 		l.RoomIdleTTL = d.RoomIdleTTL
