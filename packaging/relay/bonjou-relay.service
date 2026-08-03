@@ -1,0 +1,46 @@
+[Unit]
+Description=Bonjou web relay
+Documentation=https://github.com/hamzaabdulwahab/bonjou-cli
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bonjou-relay
+Group=bonjou-relay
+ExecStart=/usr/local/bin/bonjou-relay \
+    -addr 127.0.0.1:46330 \
+    -origins ${BONJOU_RELAY_ORIGINS} \
+    -log-dir /var/log/bonjou-relay \
+    -trust-proxy
+EnvironmentFile=/etc/default/bonjou-relay
+Restart=always
+RestartSec=2
+
+# The relay holds no key material and writes nothing but its own log
+# directory, so it can run with almost everything taken away.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/log/bonjou-relay
+
+# This box also runs ollama and open-webui. A hard memory ceiling means a
+# runaway relay gets killed on its own rather than triggering the OOM
+# killer against its neighbours.
+MemoryMax=2G
+TasksMax=4096
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -366,6 +366,49 @@ This design breaks three stated rules and they must be updated:
 It does not breach the rule that matters most: the relay never touches
 `envelope`, `sealedEnvelope`, `crypto.go`, or `known_peers.go`.
 
+## Implementation notes
+
+Recorded after the build, where reality differed from the design above.
+
+**Deployed at** `https://bonjou.80-225-228-65.sslip.io`. sslip.io resolves any
+`<label>.<ip-with-dashes>.sslip.io`, so the relay took its own hostname with its
+own Certbot certificate rather than sharing the existing `claustra` vhost. That
+vhost was left untouched.
+
+**The download declares Content-Length.** `transfer_begin` carries the total
+ciphertext size, which the relay puts on the `GET` response. This gives the
+browser native progress and, more importantly, makes a truncated transfer a
+*failed* download rather than a silently short file. It leaks nothing: the relay
+already learns the byte count by counting bytes.
+
+**Chunk length is validated before any copy.** Because Content-Length is fixed
+when the transfer begins, writing past it would be rejected by net/http
+mid-copy — after the excess had already reached the receiver. `ServeUpload`
+therefore checks `written + ContentLength <= size` up front and refuses the
+chunk, and requires a Content-Length (411 otherwise).
+
+**No per-chunk retry.** The design named resumability as a benefit of chunked
+uploads. It is not implemented and the mechanism does not currently allow it:
+the relay fails a transfer on any mid-copy error, so a chunk that partially
+reached the receiver cannot be safely resent. Resumption needs relay-side
+support and is future work. Chunking still buys accurate progress and bounded
+memory.
+
+**Checksums are empty.** The offer envelope's `checksum` field is sent blank.
+Per-chunk AEAD authenticates every byte in flight, so a whole-file SHA-256 would
+add nothing while forcing a full read of a multi-gigabyte file before the
+transfer could start.
+
+**Origins are currently `*`.** The relay accepts any browser origin because the
+production frontend URL is not yet known. This should be narrowed to the real
+origin once the site is deployed — it is what stops a hostile page from creating
+rooms in a visitor's browser.
+
+**Verified in production.** A 48 MB end-to-end transfer round-tripped
+byte-identical (`website/scripts/smoke-relay.mjs`). Relay memory held at
+2.5–2.6 MB throughout and nginx's spool directories stayed empty, confirming
+that neither the relay nor nginx buffers payloads.
+
 ## Out of scope
 
 - Offline or store-and-forward delivery. Both parties must be online

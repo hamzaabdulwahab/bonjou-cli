@@ -1,5 +1,18 @@
 {
   "installCommand": "cd website && npm ci",
   "buildCommand": "cd website && npm run build",
-  "outputDirectory": "website/dist"
+  "outputDirectory": "website/dist",
+  "rewrites": [
+    { "source": "/r/:code", "destination": "/share.html" },
+    { "source": "/share", "destination": "/share.html" }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
+  ]
 }

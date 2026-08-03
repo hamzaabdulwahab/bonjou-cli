@@ -1,36 +1,22 @@
-import { defineConfig } from 'vite'
-import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
+import { fileURLToPath } from "node:url";
 
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
-function figmaAssetResolver() {
-  return {
-    name: 'figma-asset-resolver',
-    resolveId(id) {
-      if (id.startsWith('figma:asset/')) {
-        const filename = id.replace('figma:asset/', '')
-        return path.resolve(__dirname, 'src/assets', filename)
-      }
-    },
-  }
-}
+const entry = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
 export default defineConfig({
-  plugins: [
-    figmaAssetResolver(),
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
+  plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        // The marketing page and the share app ship from one project so
+        // they share a deploy, but they stay independent entries: the
+        // marketing page carries no app bundle, and the app carries no
+        // marketing markup.
+        main: entry("index.html"),
+        share: entry("share.html"),
+      },
     },
   },
-
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
-  assetsInclude: ['**/*.svg', '**/*.csv'],
-})
+});

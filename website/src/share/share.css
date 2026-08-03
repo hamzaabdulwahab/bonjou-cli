@@ -1,0 +1,370 @@
+/* Share app styling. Palette and type scale follow the marketing page so
+   the two halves of the product read as one thing. */
+
+:root {
+  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --navy-950: #0a1628;
+  --navy-900: #0f1d33;
+  --navy-800: #152138;
+  --navy-700: #1c2d4a;
+  --navy-600: #2a3f5f;
+
+  --text: #e6edf6;
+  --text-muted: #8ba0bd;
+  --accent: #4da3ff;
+  --accent-dim: #2b6fb8;
+  --good: #3ecf8e;
+  --bad: #ff6b6b;
+  --warn: #ffc857;
+
+  --radius: 10px;
+  --gap: 1rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #12243f 0%, transparent 60%),
+    var(--navy-950);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.5rem;
+}
+
+.brand {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+.brand:hover {
+  color: var(--accent);
+}
+
+.card {
+  background: linear-gradient(180deg, var(--navy-900), var(--navy-950));
+  border: 1px solid var(--navy-700);
+  border-radius: var(--radius);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gate h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.gate form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.gate input {
+  flex: 1 1 12rem;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+}
+
+.muted {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.error {
+  color: var(--bad);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.row.gap {
+  gap: 0.5rem;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.share-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.share-row input {
+  flex: 1 1 14rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+input,
+button {
+  font-family: inherit;
+  font-size: 0.92rem;
+  border-radius: 8px;
+  border: 1px solid var(--navy-600);
+  padding: 0.55rem 0.8rem;
+}
+
+input {
+  background: var(--navy-950);
+  color: var(--text);
+  min-width: 0;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input[type="file"] {
+  padding: 0.7rem;
+  cursor: pointer;
+}
+
+input[type="file"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button {
+  background: var(--accent-dim);
+  border-color: var(--accent-dim);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  border-color: var(--navy-600);
+  color: var(--text-muted);
+}
+
+button.ghost:hover {
+  background: var(--navy-800);
+  border-color: var(--navy-600);
+  color: var(--text);
+}
+
+.pill {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--navy-600);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pill-connected {
+  color: var(--good);
+  border-color: rgba(62, 207, 142, 0.4);
+}
+
+.pill-reconnecting,
+.pill-connecting {
+  color: var(--warn);
+  border-color: rgba(255, 200, 87, 0.4);
+}
+
+.pill-closed {
+  color: var(--bad);
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--navy-800);
+  border: 1px solid var(--navy-600);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.notice button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.peers,
+.transfers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.peers li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.7rem;
+  background: var(--navy-950);
+  border: 1px solid var(--navy-700);
+  border-radius: 8px;
+}
+
+.peers label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.peer-name {
+  font-weight: 500;
+}
+
+.fingerprint {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.transfers li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--navy-950);
+  border: 1px solid var(--navy-700);
+  border-radius: 8px;
+}
+
+.filename {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.progress-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.state-done {
+  color: var(--good);
+}
+
+.state-failed,
+.state-declined {
+  color: var(--bad);
+}
+
+.bar {
+  height: 4px;
+  background: var(--navy-800);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.foot {
+  border-top: 1px solid var(--navy-800);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .shell {
+    padding: 1.25rem 1rem 3rem;
+  }
+
+  .code {
+    font-size: 1.5rem;
+  }
+}
