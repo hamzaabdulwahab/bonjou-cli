@@ -5,11 +5,13 @@
    a physical object on the page, not a screenshot of one, so the page
    is bright and the tool is not.
 
-   Type: Schibsted Grotesk carries display and body, with hierarchy from
-   weight and size alone. No synthetic width stretching. JetBrains Mono is
-   reserved for things that are literally data: codes, byte counts, shell
-   commands. Labels are small-caps sans, because a wide mono set in caps
-   at 10px is hard to read and looks like a readout for its own sake.
+   Type: Satoshi carries display and body. Geometric and warm rather than
+   newsy, which is the register modern product interfaces sit in, with
+   hierarchy from weight and size alone and no synthetic width stretching.
+   JetBrains Mono is reserved for things that are literally data: codes,
+   byte counts, shell commands. Labels are small-caps sans, because a wide
+   mono set in caps at 10px is hard to read and looks like a readout for
+   its own sake.
 
    Color: committed vermilion. It marks one thing only, presence, and is
    never used decoratively. If it glows, someone is there.
@@ -38,8 +40,8 @@
   --wire: oklch(88% 0.012 250);
   --good: oklch(62% 0.15 155);
 
-  --display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --body: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --display: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --body: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --gutter: clamp(1.25rem, 4vw, 4rem);
@@ -89,8 +91,8 @@ h1,
 h2,
 h3 {
   font-family: var(--display);
-  font-weight: 800;
-  letter-spacing: -0.028em;
+  font-weight: 900;
+  letter-spacing: -0.03em;
   line-height: 1.02;
   margin: 0;
   text-wrap: balance;
@@ -107,6 +109,7 @@ h2 {
 h3 {
   font-size: clamp(1.05rem, 0.98rem + 0.4vw, 1.25rem);
   font-weight: 700;
+  letter-spacing: -0.014em;
   letter-spacing: -0.012em;
   line-height: 1.2;
 }
@@ -178,7 +181,7 @@ a:hover {
 
 .wordmark {
   font-family: var(--display);
-  font-weight: 800;
+  font-weight: 900;
   font-size: 1.2rem;
   letter-spacing: -0.035em;
   text-decoration: none;
