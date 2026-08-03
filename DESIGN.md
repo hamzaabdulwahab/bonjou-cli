@@ -44,14 +44,17 @@ surface is needed, use an explicit warm dark (`oklch(30% 0.075 32)`) rather than
 
 ## Typography
 
-**Archivo** carries display and body. One family, with voice coming from width
-and weight rather than a second typeface: headings at weight 800 and
-`font-stretch: 112%`, body at 400.
+**Satoshi** (Fontshare) carries display and body. Geometric and warm rather
+than newsy, which is the register product interfaces sit in. Headings at 900,
+body at 400. Hierarchy comes from weight and size only: never `font-stretch`,
+which distorts letterforms rather than substituting a drawn width.
 
-**Martian Mono** handles readouts only: room codes, fingerprints, byte counts,
-eyebrows, status. It is wide and loud, so it appears small and sparingly.
+**JetBrains Mono** is reserved for things that are literally data: room codes,
+byte counts, shell commands, step numbers. Labels are small-caps sans. Wide
+mono set in caps at 10px is hard to read and looks like a readout for its own
+sake, which is what the first version got wrong.
 
-Rejected on purpose: Inter, IBM Plex, Space Grotesk, and the other
+Rejected on purpose: Inter, IBM Plex, Space Grotesk, Archivo, and the other
 training-default faces. Do not reintroduce them.
 
 Scale is fluid `clamp()` with at least a 1.25 ratio between steps. Body measure
@@ -67,15 +70,36 @@ caps at 68ch.
   the first item full width because it is the argument and the rest support it.
   Equal cards would flatten that.
 
+## Information architecture
+
+The tool is a conversation, not a dashboard. People on the left, one thread on
+the right, one composer beneath both.
+
+**Everyone is a view, not a channel.** Selecting it shows every event from
+everybody merged by time, and the composer addresses all reachable peers.
+Selecting a person filters to events involving them and retargets the composer.
+This keeps broadcast working without a multi-select mode.
+
+Messages and transfers are one event type with one timeline. They were three
+parallel lists with timestamps on only one of them, which made correct
+ordering impossible rather than merely missing. If a new kind of activity is
+added, it joins `ThreadEvent`; it does not get its own list.
+
+A fan-out to several people collapses to a single row carrying the aggregate,
+and the aggregate reports every state present ("Sent to 1, 2 yet to approve"),
+because a broadcast is rarely in one state and naming only the dominant one
+misleads.
+
 ## Components
 
-- **Instrument.** Dark panel, 14px radius, two panes divided by a 1px rule
-  drawn with a grid gap over a `--panel-line` background. Left pane is presence
-  plus how to reach further, pinned to the top and bottom so it never opens with
-  a dead zone. Right pane is composer plus activity.
-- **Presence node.** The signature element. A pulsing blip, a name, a
-  fingerprint, and a source tag. Selected state is a vermilion border and warm
-  dark fill. It is a real `<button>` with `aria-pressed`.
+- **Instrument.** Dark panel, 14px radius. Rail and thread divided by a 1px
+  rule drawn with a grid gap over `--panel-line`. Composer spans the full
+  width beneath both.
+- **Rail chip.** A conversation. Pulsing blip, name, and either a source tag
+  or an unread count. `aria-current` marks the active one.
+- **Pending offer.** The only row that carries the signal colour, because it
+  is the only one asking for a decision. It stays in chronological position
+  rather than being hoisted into a separate region.
 - **Steps.** Numbered `01`/`02`/`03` because the order genuinely carries meaning:
   nothing can be approved before it is offered. Do not number things that are
   not sequences.
@@ -103,5 +127,8 @@ The blip's ping is the only ambient motion on the page. Keep it that way.
   through it and reads as a rendering fault.
 - Sections carry `scroll-margin-top` matching the masthead height so anchors do
   not land underneath it.
+- Page-level rules are scoped to `main > section`, never bare `section`. The
+  thread inside the instrument is a section element too, and a bare selector
+  silently gave it 100px of page padding.
 - Install commands are copied verbatim from README.md. They are executed as
   written, so they are never paraphrased or pointed at a nicer-looking domain.

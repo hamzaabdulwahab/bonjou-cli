@@ -58,21 +58,13 @@ export default function App() {
       <main>
         <section className="hero wrap">
           <div className="hero-copy">
-            <p className="eyebrow">Local network transfer, in the browser</p>
             <h1>
               Everyone on your Wi&#8209;Fi is <em>already here</em>.
             </h1>
             <p className="lede">
-              Send a message, a file, or a whole folder straight to the laptop
-              across the table. Encrypted in your browser before it leaves,
-              relayed without ever being stored, and never written to anyone's
-              disk until they say yes.
-            </p>
-            <p className="hero-meta">
-              <span>No accounts</span>
-              <span>Nothing stored</span>
-              <span>Any file size</span>
-              <span>Open source</span>
+              Messages, files, and folders, straight to the laptop across the
+              table. Encrypted in your browser, never stored, never saved
+              without a yes.
             </p>
           </div>
 
@@ -83,9 +75,11 @@ export default function App() {
             code={session.code}
             peers={session.peers}
             fingerprints={session.fingerprints}
-            outgoing={session.outgoing}
-            incoming={session.incoming}
-            chat={session.chat}
+            events={session.events}
+            received={session.received}
+            pendingCount={session.pendingCount}
+            unread={session.unread}
+            markRead={session.markRead}
             notice={session.notice}
             networkGrouped={session.networkGrouped}
             onNotice={session.setNotice}

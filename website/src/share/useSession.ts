@@ -35,6 +35,15 @@ export const RELAY_BASE = (
 
 const RELAY_WS = `${RELAY_BASE.replace(/^http/, "ws")}/ws`;
 
+export type OutgoingState = "offered" | "sending" | "done" | "failed" | "declined";
+export type IncomingState =
+  | "pending"
+  | "approved"
+  | "receiving"
+  | "done"
+  | "failed"
+  | "declined";
+
 export interface OutgoingItem {
   requestId: string;
   peerId: string;
@@ -42,9 +51,17 @@ export interface OutgoingItem {
   file: File;
   label: string;
   streamId: Uint8Array;
-  state: "offered" | "sending" | "done" | "failed" | "declined";
+  state: OutgoingState;
   sentBytes: number;
   error?: string;
+  at: number;
+  /**
+   * Sending one file to several people fans out into one transfer each,
+   * because a shared secret is per pair. groupId ties those back together
+   * so the Everyone view can show a single row instead of one per
+   * recipient.
+   */
+  groupId: string;
 }
 
 export interface IncomingItem {
@@ -54,17 +71,45 @@ export interface IncomingItem {
   name: string;
   size: number;
   streamId: string;
-  state: "pending" | "approved" | "receiving" | "done" | "failed" | "declined";
+  state: IncomingState;
   error?: string;
+  at: number;
 }
 
 export interface ChatLine {
   id: string;
+  /** Inbound: the sender. Outbound: everyone it was addressed to. */
+  peerIds: string[];
   from: string;
   text: string;
   at: number;
   outbound: boolean;
 }
+
+/**
+ * One entry in a conversation. Messages and transfers share a shape so a
+ * thread can sort them into a single true timeline; the previous model
+ * kept three parallel lists with no timestamps on two of them, which made
+ * correct ordering impossible rather than merely absent.
+ */
+export type ThreadEvent =
+  | { kind: "message"; id: string; at: number; peerIds: string[]; line: ChatLine }
+  | {
+      kind: "incoming";
+      id: string;
+      at: number;
+      peerIds: string[];
+      item: IncomingItem;
+    }
+  | {
+      kind: "outgoing";
+      id: string;
+      at: number;
+      peerIds: string[];
+      item: OutgoingItem;
+    };
+
+export const EVERYONE = "everyone";
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
@@ -255,9 +300,13 @@ export function useSession(name: string, active: boolean) {
           ...lines,
           {
             id: `${from}-${envelope.ts}-${lines.length}`,
+            peerIds: [from],
             from: envelope.from || peerName(from),
             text: envelope.message,
-            at: envelope.ts * 1000,
+            // Trust the local clock for ordering. A peer's timestamp
+            // orders their own messages fine but can sit anywhere
+            // relative to ours if their clock is off.
+            at: Date.now(),
             outbound: false,
           },
         ]);
@@ -273,6 +322,7 @@ export function useSession(name: string, active: boolean) {
           size: envelope.size,
           streamId: envelope.stream_id ?? "",
           state: "pending",
+          at: Date.now(),
         };
         incomingRef.current.set(item.requestId, item);
         syncIncoming();
@@ -391,9 +441,10 @@ export function useSession(name: string, active: boolean) {
         ...lines,
         {
           id: `me-${at}-${lines.length}`,
+          peerIds: [...targets],
           from: name,
           text: trimmed,
-          at: at * 1000,
+          at: Date.now(),
           outbound: true,
         },
       ]);
@@ -410,6 +461,10 @@ export function useSession(name: string, active: boolean) {
     async (targets: string[], files: File[], asFolder = false) => {
       const client = clientRef.current;
       if (!client || targets.length === 0 || files.length === 0) return;
+
+      // One group per file, spanning its recipients.
+      const groups = new Map<File, string>();
+      for (const file of files) groups.set(file, toHex(randomBytes(6)));
 
       for (const to of targets) {
         for (const file of files) {
@@ -431,6 +486,8 @@ export function useSession(name: string, active: boolean) {
             streamId,
             state: "offered",
             sentBytes: 0,
+            at: Date.now(),
+            groupId: groups.get(file) ?? requestId,
           });
           syncOutgoing();
 
@@ -520,14 +577,78 @@ export function useSession(name: string, active: boolean) {
   const createRoom = useCallback(() => clientRef.current?.createRoom(), []);
   const joinRoom = useCallback((value: string) => clientRef.current?.joinRoom(value), []);
 
+  /**
+   * Every message and transfer as one time-ordered list. Threads are a
+   * filter over this rather than separate stores, so a message and the
+   * file it refers to cannot drift apart in the display.
+   */
+  const events = useMemo<ThreadEvent[]>(() => {
+    const merged: ThreadEvent[] = [
+      ...chat.map((line) => ({
+        kind: "message" as const,
+        id: line.id,
+        at: line.at,
+        peerIds: line.peerIds,
+        line,
+      })),
+      ...incoming.map((item) => ({
+        kind: "incoming" as const,
+        id: item.requestId,
+        at: item.at,
+        peerIds: [item.from],
+        item,
+      })),
+      ...outgoing.map((item) => ({
+        kind: "outgoing" as const,
+        id: item.requestId,
+        at: item.at,
+        peerIds: [item.peerId],
+        item,
+      })),
+    ];
+    return merged.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+  }, [chat, incoming, outgoing]);
+
+  /** Files that actually arrived, newest first. */
+  const received = useMemo(
+    () => incoming.filter((item) => item.state === "done").sort((a, b) => b.at - a.at),
+    [incoming],
+  );
+
+  const pendingCount = useMemo(
+    () => incoming.filter((item) => item.state === "pending").length,
+    [incoming],
+  );
+
+  // Unread is per thread and time based, so it survives a peer list that
+  // reorders and needs no per-event read flags.
+  const [seenAt, setSeenAt] = useState<Record<string, number>>({});
+  const markRead = useCallback((threadId: string) => {
+    setSeenAt((current) => ({ ...current, [threadId]: Date.now() }));
+  }, []);
+
+  const unread = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const event of events) {
+      if (event.kind === "message" && event.line.outbound) continue;
+      if (event.kind === "outgoing") continue;
+      for (const peerId of event.peerIds) {
+        if (event.at > (seenAt[peerId] ?? 0)) out[peerId] = (out[peerId] ?? 0) + 1;
+      }
+    }
+    return out;
+  }, [events, seenAt]);
+
   return {
     status,
     code,
     peers,
     fingerprints,
-    outgoing,
-    incoming,
-    chat,
+    events,
+    received,
+    pendingCount,
+    unread,
+    markRead,
     notice,
     networkGrouped,
     setNotice,
