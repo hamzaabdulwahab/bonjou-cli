@@ -22,7 +22,7 @@ import {
 } from "./transfer";
 
 const RELAY_BASE = (
-  import.meta.env.VITE_RELAY_URL ?? "https://80-225-228-65.sslip.io"
+  import.meta.env.VITE_RELAY_URL ?? "https://bonjou.80-225-228-65.sslip.io"
 ).replace(/\/$/, "");
 
 const RELAY_WS = `${RELAY_BASE.replace(/^http/, "ws")}/ws`;
