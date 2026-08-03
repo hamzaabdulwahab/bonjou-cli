@@ -3,6 +3,7 @@
   "buildCommand": "cd website && npm run build",
   "outputDirectory": "website/dist",
   "rewrites": [
+    { "source": "/", "destination": "/share.html" },
     { "source": "/r/:code", "destination": "/share.html" },
     { "source": "/share", "destination": "/share.html" }
   ],

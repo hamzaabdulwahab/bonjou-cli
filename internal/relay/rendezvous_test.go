@@ -162,6 +162,73 @@ func TestRendezvousStreamsChunksInOrder(t *testing.T) {
 // Ordering is the sender's responsibility, but the relay must refuse to
 // silently reorder: a scrambled ciphertext stream would fail to decrypt
 // with a confusing error far from the real cause.
+// A browser stops reading as soon as Content-Length is satisfied, which
+// usually happens before the sender's /end call lands. That is a normal
+// completion, and recording it as a failure would make every successful
+// transfer log an error.
+func TestReceiverDisconnectAfterFullPayloadIsSuccess(t *testing.T) {
+	rv, srv := newTestRendezvous(t, DefaultLimits())
+	payload := bytes.Repeat([]byte("z"), 4096)
+	x, err := rv.Begin("sender", "receiver", int64(len(payload)))
+	if err != nil {
+		t.Fatalf("Begin: %v", err)
+	}
+
+	result := startDownload(t, srv, x.id, x.recvToken)
+	if status := postChunk(t, srv, x.id, x.sendToken, 0, payload); status != http.StatusNoContent {
+		t.Fatalf("chunk status = %d, want 204", status)
+	}
+
+	// The client's ReadAll returns once Content-Length is met and closes
+	// the connection, without the sender having called /end yet.
+	got := <-result
+	if got.err != nil {
+		t.Fatalf("download: %v", got.err)
+	}
+	if !bytes.Equal(got.body, payload) {
+		t.Fatal("payload mismatch")
+	}
+
+	waitFor(t, x.done, 3*time.Second, "transfer to settle")
+	if err := x.err(); err != nil {
+		t.Fatalf("fully delivered transfer recorded a failure: %v", err)
+	}
+}
+
+// A receiver that vanishes partway through is still a failure.
+func TestReceiverDisconnectBeforeFullPayloadIsFailure(t *testing.T) {
+	rv, srv := newTestRendezvous(t, DefaultLimits())
+	x, err := rv.Begin("sender", "receiver", 8192)
+	if err != nil {
+		t.Fatalf("Begin: %v", err)
+	}
+
+	client := testClient()
+	resp, err := client.Get(srv.URL + "/t/" + x.id + "?token=" + x.recvToken)
+	if err != nil {
+		t.Fatalf("download: %v", err)
+	}
+	waitFor(t, x.ready, 3*time.Second, "receiver to attach")
+
+	// Hang up having received nothing of the 8192 declared bytes.
+	_ = resp.Body.Close()
+	client.CloseIdleConnections()
+
+	waitFor(t, x.done, 3*time.Second, "transfer to fail")
+	if x.err() == nil {
+		t.Fatal("a receiver that left early was not recorded as a failure")
+	}
+}
+
+func waitFor(t *testing.T, ch <-chan struct{}, timeout time.Duration, what string) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(timeout):
+		t.Fatalf("timed out waiting for %s", what)
+	}
+}
+
 func TestRendezvousRejectsOutOfOrderChunk(t *testing.T) {
 	rv, srv := newTestRendezvous(t, DefaultLimits())
 	x, err := rv.Begin("sender", "receiver", 10)
@@ -327,6 +394,25 @@ func TestAbortForPeerFailsTransfer(t *testing.T) {
 	}
 	if x.err() == nil {
 		t.Fatal("transfer error not recorded")
+	}
+}
+
+// Both peers disconnect right after a successful transfer. Those
+// disconnects must not retroactively mark the completed transfer as
+// aborted.
+func TestAbortForPeerIgnoresFinishedTransfers(t *testing.T) {
+	rv := NewRendezvous(DefaultLimits(), nil)
+	x, err := rv.Begin("sender", "receiver", 10)
+	if err != nil {
+		t.Fatalf("Begin: %v", err)
+	}
+	x.complete()
+
+	if ids := rv.AbortForPeer("sender", errors.New("peer disconnected")); len(ids) != 0 {
+		t.Fatalf("AbortForPeer reported %v for an already-finished transfer", ids)
+	}
+	if x.err() != nil {
+		t.Fatalf("finished transfer was marked failed: %v", x.err())
 	}
 }
 

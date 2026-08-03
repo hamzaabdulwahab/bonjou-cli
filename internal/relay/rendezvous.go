@@ -178,9 +178,19 @@ func (v *Rendezvous) AbortForPeer(peerID string, reason error) []string {
 	v.mu.RLock()
 	affected := make([]*transfer, 0)
 	for _, x := range v.transfers {
-		if x.from == peerID || x.to == peerID {
-			affected = append(affected, x)
+		if x.from != peerID && x.to != peerID {
+			continue
 		}
+		// Skip transfers that already finished. Both peers normally
+		// disconnect moments after a successful transfer, and reporting
+		// those as aborted would describe every completed send as a
+		// casualty of the disconnect that followed it.
+		select {
+		case <-x.done:
+			continue
+		default:
+		}
+		affected = append(affected, x)
 	}
 	v.mu.RUnlock()
 
@@ -237,7 +247,17 @@ func (v *Rendezvous) ServeDownload(w http.ResponseWriter, r *http.Request, id, t
 	select {
 	case <-x.done:
 	case <-r.Context().Done():
-		x.fail(errors.New("receiver disconnected"))
+		// A receiver that has taken every declared byte and then hung up
+		// has finished, not failed. Content-Length is satisfied at that
+		// point, so the browser is entitled to close before the sender's
+		// /end call arrives — and it usually does, since the sender needs
+		// another round trip. Treating that as an error would make every
+		// successful transfer log a failure.
+		if x.written.Load() >= x.size {
+			x.complete()
+		} else {
+			x.fail(errors.New("receiver disconnected"))
+		}
 	}
 
 	// Declaring Content-Length up front means a failed transfer produces a

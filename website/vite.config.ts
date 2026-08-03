@@ -10,11 +10,12 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        // The marketing page and the share app ship from one project so
-        // they share a deploy, but they stay independent entries: the
-        // marketing page carries no app bundle, and the app carries no
-        // marketing markup.
-        main: entry("index.html"),
+        // Only the share app is built. index.html is the in-progress
+        // marketing page and is deliberately left out: nothing currently
+        // links to it, and excluding it means a half-finished edit there
+        // cannot break a deploy. Re-add `main: entry("index.html")` to
+        // ship it again — vercel.json's "/" rewrite defers to a real
+        // static file at the root whenever one exists.
         share: entry("share.html"),
       },
     },
