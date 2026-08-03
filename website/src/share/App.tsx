@@ -246,8 +246,9 @@ export default function App() {
               <dt>First contact is trust on first use</dt>
               <dd>
                 Public keys arrive through the relay, so a hostile relay could
-                substitute its own. Compare the eight&#8209;byte fingerprint
-                shown beside each name out loud to rule that out.
+                substitute its own. Hover a name to see its
+                eight&#8209;byte fingerprint, and read it aloud to each other
+                to rule that out.
               </dd>
             </div>
             <div className="fact is-limit">

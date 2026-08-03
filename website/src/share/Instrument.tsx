@@ -97,22 +97,26 @@ export function Instrument(props: InstrumentProps) {
   const allSelected = peers.length > 0 && selected.length === peers.length;
   const canSend = selected.length > 0;
 
-  // Names come from localStorage, which every tab of a browser shares, so
-  // several peers legitimately arrive called the same thing. Add the
-  // leading fingerprint bytes only to the ones that collide, so unique
-  // names stay clean.
+  // Names come from localStorage, which every tab of a browser profile
+  // shares, so several peers legitimately arrive called the same thing.
+  // Number the duplicates. Hex would be exact but reads as a serial
+  // number, and nobody picks a person out of a list that way.
   const labels = useMemo(() => {
     const counts = new Map<string, number>();
     for (const peer of peers) counts.set(peer.name, (counts.get(peer.name) ?? 0) + 1);
+    const seen = new Map<string, number>();
     const out: Record<string, string> = {};
     for (const peer of peers) {
-      out[peer.id] =
-        (counts.get(peer.name) ?? 0) > 1
-          ? `${peer.name} ${(fingerprints[peer.id] ?? peer.id).slice(0, 5)}`
-          : peer.name;
+      if ((counts.get(peer.name) ?? 0) > 1) {
+        const nth = (seen.get(peer.name) ?? 0) + 1;
+        seen.set(peer.name, nth);
+        out[peer.id] = `${peer.name} (${nth})`;
+      } else {
+        out[peer.id] = peer.name;
+      }
     }
     return out;
-  }, [peers, fingerprints]);
+  }, [peers]);
 
   if (!name) {
     return (
@@ -175,12 +179,14 @@ export function Instrument(props: InstrumentProps) {
                     className="node"
                     aria-pressed={selected.includes(peer.id)}
                     onClick={() => toggle(peer.id)}
+                    title={
+                      fingerprints[peer.id]
+                        ? `Security fingerprint ${fingerprints[peer.id]}. Read it aloud to each other to confirm nobody is in the middle.`
+                        : undefined
+                    }
                   >
                     <span className="blip" aria-hidden="true" />
-                    <span className="node-name">
-                      {labels[peer.id] ?? peer.name}
-                      <span className="fingerprint">{fingerprints[peer.id] ?? "…"}</span>
-                    </span>
+                    <span className="node-name">{labels[peer.id] ?? peer.name}</span>
                     <span className="node-tag">
                       {peer.source === "network" ? "wi-fi" : "room"}
                     </span>

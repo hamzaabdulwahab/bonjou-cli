@@ -1,17 +1,1338 @@
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <meta name="theme-color" content="#171613" />
-      <link rel="icon" type="image/png" href="/src/assets/logo-mark.png" />
-      <title>Bonjou: LAN chat and file transfer from the terminal</title>
-      <meta name="description" content="Bonjou is a terminal CLI that finds peers on your local subnet and moves messages, files, and folders between them over an encrypted peer to peer channel. macOS, Linux, Windows." />
-      <style>html, body { height: 100%; margin: 0; background: #171613; } #root { height: 100%; }</style>
-    </head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bonjou — LAN Chat & File Transfer</title>
+    <meta name="description" content="Serverless, internet-free LAN chat and file transfers directly from your terminal. No accounts. No cloud. No setup.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
+            --navy-950: #0a1628;
+            --navy-900: #0f1d33;
+            --navy-800: #152138;
+            --navy-700: #1c2d4a;
+            --navy-600: #2a3f5f;
+            --navy-500: #3d5a80;
+            --navy-400: #5a7da0;
+            --navy-300: #8aa4c0;
+            --navy-200: #b8c9db;
+            --navy-100: #d8e3ee;
+            --navy-50: #f0f4f8;
+
+            --blue-600: #2563eb;
+            --blue-500: #3b82f6;
+            --blue-400: #60a5fa;
+            --blue-300: #93c5fd;
+            --blue-100: #dbeafe;
+            --blue-50: #eff6ff;
+
+            --slate-900: #111827;
+            --slate-800: #1f2937;
+            --slate-700: #374151;
+            --slate-600: #4b5563;
+            --slate-500: #6b7280;
+            --slate-400: #9ca3af;
+            --slate-300: #d1d5db;
+            --slate-200: #e5e7eb;
+            --slate-100: #f3f4f6;
+            --slate-50: #f9fafb;
+
+            --green-600: #059669;
+            --green-500: #10b981;
+
+            --text-primary: var(--navy-950);
+            --text-secondary: var(--navy-700);
+            --text-tertiary: var(--navy-500);
+            --text-muted: var(--slate-500);
+            --text-inverse: #ffffff;
+
+            --bg-primary: #ffffff;
+            --bg-secondary: var(--navy-50);
+            --bg-dark: var(--navy-950);
+            --bg-terminal: var(--slate-900);
+
+            --accent: var(--blue-600);
+            --accent-hover: var(--blue-500);
+            --accent-light: var(--blue-100);
+
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(10,22,40,0.08);
+            --shadow-lg: 0 12px 40px rgba(10,22,40,0.12);
+            --shadow-xl: 0 24px 80px rgba(10,22,40,0.16);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: var(--font-body);
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ── Scrollbar ─────────────────────────── */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--navy-200); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--navy-300); }
+
+        /* ── Utilities ──────────────────────────── */
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .mono { font-family: var(--font-mono); }
+
+        /* ── Navigation ───────────────────────── */
+        .nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border-bottom: 1px solid rgba(10,22,40,0.06);
+        }
+
+        .nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            font-family: var(--font-mono);
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-mark {
+            width: 28px;
+            height: 28px;
+            background: var(--accent);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover { color: var(--text-primary); }
+
+        .nav-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            background: var(--accent);
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            transition: background 0.2s ease, transform 0.15s ease;
+        }
+
+        .nav-cta:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* ── Hero ─────────────────────────────── */
+        .hero {
+            padding-top: 140px;
+            padding-bottom: 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .hero-bg::before {
+            content: '';
+            position: absolute;
+            top: -40%;
+            right: -10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--blue-100) 0%, transparent 70%);
+            opacity: 0.6;
+        }
+
+        .hero-bg::after {
+            content: '';
+            position: absolute;
+            bottom: -20%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, var(--navy-100) 0%, transparent 70%);
+            opacity: 0.4;
+        }
+
+        .hero-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 20px;
+        }
+
+        .hero-eyebrow span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--green-500);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .hero h1 {
+            font-size: clamp(2.8rem, 5vw, 4.2rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+            margin-bottom: 24px;
+        }
+
+        .hero h1 em {
+            font-style: normal;
+            color: var(--accent);
+        }
+
+        .hero-desc {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            line-height: 1.75;
+            max-width: 480px;
+            margin-bottom: 32px;
+        }
+
+        .hero-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(37,99,235,0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-primary);
+            border: 1px solid var(--slate-200);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--slate-300);
+            background: var(--slate-50);
+        }
+
+        .hero-terms {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Terminal ─────────────────────────── */
+        .terminal {
+            background: var(--bg-terminal);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 18px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .term-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .term-dot.red { background: #ff5f56; }
+        .term-dot.yellow { background: #ffbd2e; }
+        .term-dot.green { background: #27c93f; }
+
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--slate-500);
+            margin-right: 60px;
+        }
+
+        .terminal-body {
+            padding: 20px 18px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.8;
+            color: var(--slate-300);
+        }
+
+        .term-prompt {
+            color: var(--green-500);
+        }
+
+        .term-input {
+            color: var(--slate-200);
+        }
+
+        .term-comment {
+            color: var(--slate-500);
+        }
+
+        .term-user { color: #60a5fa; }
+        .term-cmd { color: #c4b5fd; }
+        .term-success { color: #34d399; }
+        .term-warn { color: #fbbf24; }
+
+        .typing-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1.1em;
+            background: var(--green-500);
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-top;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* ── Proof Strip ──────────────────────── */
+        .proof-strip {
+            background: var(--navy-50);
+            border-top: 1px solid var(--navy-100);
+            border-bottom: 1px solid var(--navy-100);
+            padding: 32px 0;
+        }
+
+        .proof-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+        }
+
+        .proof-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .proof-icon {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            border-radius: var(--radius-sm);
+            background: white;
+            border: 1px solid var(--navy-100);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+        }
+
+        .proof-item h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .proof-item p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ── Sections ─────────────────────────── */
+        .section {
+            padding: 100px 0;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 640px;
+            margin: 0 auto 60px;
+        }
+
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 16px;
+        }
+
+        .section-label::before {
+            content: '$ ';
+        }
+
+        .section-header h2 {
+            font-size: clamp(2rem, 3.5vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+        }
+
+        /* ── Use Cases ────────────────────────── */
+        .usecases-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .usecase-card {
+            padding: 28px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--slate-200);
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .usecase-card:hover {
+            border-color: var(--navy-200);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-3px);
+        }
+
+        .usecase-card h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .usecase-card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .usecase-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 16px;
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            background: var(--blue-50);
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        /* ── Workflow ──────────────────────────── */
+        .workflow-section {
+            background: linear-gradient(180deg, var(--bg-primary) 0%, var(--navy-50) 100%);
+        }
+
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            counter-reset: step;
+        }
+
+        .step {
+            position: relative;
+            padding: 32px 24px;
+            border-radius: var(--radius-lg);
+            background: white;
+            border: 1px solid var(--slate-200);
+        }
+
+        .step::before {
+            counter-increment: step;
+            content: '0' counter(step);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 16px;
+        }
+
+        .step h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .step p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .step-code {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--navy-600);
+            background: var(--slate-100);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--slate-200);
+        }
+
+        /* ── Product Demo ────────────────────── */
+        .product-section {
+            background: var(--navy-950);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        }
+
+        .product-section .section-header h2,
+        .product-section .section-header p {
+            color: white;
+        }
+
+        .product-section .section-header p {
+            opacity: 0.7;
+        }
+
+        .product-terminal {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .product-terminal .terminal {
+            background: #0d1117;
+        }
+
+        /* ── Security ─────────────────────────── */
+        .security-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .security-card {
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--slate-200);
+            background: white;
+        }
+
+        .security-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .security-card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .security-list {
+            list-style: none;
+        }
+
+        .security-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--slate-100);
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .security-list li:last-child { border-bottom: none; }
+
+        .check-icon {
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            margin-top: 2px;
+            color: var(--green-500);
+        }
+
+        .warn-icon {
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            margin-top: 2px;
+            color: var(--warning); /* will fallback or use orange */
+            color: #f59e0b;
+        }
+
+        .protected .security-card { border-color: #dcfce7; background: #f0fdf4; }
+        .protected .security-card h3 { color: #166534; }
+        .protected .security-list li { border-color: #bbf7d0; color: #166534; }
+
+        .limited .security-card { border-color: #fef3c7; background: #fffbeb; }
+        .limited .security-card h3 { color: #92400e; }
+        .limited .security-list li { border-color: #fde68a; color: #92400e; }
+
+        /* ── Install ──────────────────────────── */
+        .install-section {
+            background: var(--navy-50);
+        }
+
+        .install-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: white;
+            padding: 4px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--slate-200);
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .install-tab {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s ease;
+        }
+
+        .install-tab.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .install-tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: var(--slate-100);
+        }
+
+        .install-content {
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        .install-panel {
+            display: none;
+        }
+
+        .install-panel.active { display: block; }
+
+        .cmd-block {
+            background: var(--bg-terminal);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .cmd-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .cmd-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--slate-400);
+        }
+
+        .copy-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius-sm);
+            color: var(--slate-300);
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.12);
+            color: white;
+        }
+
+        .cmd-body {
+            padding: 16px 20px;
+            overflow-x: auto;
+        }
+
+        .cmd-body pre {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--slate-300);
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .cmd-body .comment { color: var(--slate-500); }
+
+        .install-note {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 24px;
+        }
+
+        .install-note a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        /* ── FAQ ──────────────────────────────── */
+        .faq-item {
+            border-bottom: 1px solid var(--slate-200);
+        }
+
+        .faq-question {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 0;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: left;
+            transition: color 0.2s ease;
+        }
+
+        .faq-question:hover { color: var(--accent); }
+
+        .faq-icon {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+        }
+
+        .faq-item.open .faq-icon { transform: rotate(45deg); color: var(--accent); }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .faq-item.open .faq-answer {
+            max-height: 300px;
+            padding-bottom: 24px;
+        }
+
+        .faq-answer p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            max-width: 720px;
+        }
+
+        /* ── Final CTA ────────────────────────── */
+        .final-cta {
+            background: var(--navy-950);
+            padding: 120px 0;
+            text-align: center;
+            position: relative;
+        }
+
+        .final-cta::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+        }
+
+        .final-cta h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            color: white;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+        }
+
+        .final-cta p {
+            font-size: 1.1rem;
+            color: var(--navy-300);
+            margin-bottom: 32px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ── Footer ────────────────────────────── */
+        .footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--slate-200);
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 48px;
+        }
+
+        .footer-brand p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+
+        .footer-col h4 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 16px;
+        }
+
+        .footer-col a {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 4px 0;
+            transition: color 0.2s ease;
+        }
+
+        .footer-col a:hover { color: var(--text-primary); }
+
+        .footer-bottom {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--slate-200);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .footer-bottom p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Responsive ──────────────────────── */
+        @media (max-width: 1024px) {
+            .hero-layout { grid-template-columns: 1fr; gap: 40px; }
+            .hero-terminal { order: -1; }
+            .usecases-grid { grid-template-columns: repeat(2, 1fr); }
+            .workflow-steps { grid-template-columns: repeat(2, 1fr); }
+            .security-grid { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+            .nav-links { display: none; }
+            .mobile-menu-btn { display: block; }
+            .hero { padding-top: 100px; }
+            .hero h1 { font-size: 2.2rem; }
+            .hero-actions { flex-direction: column; align-items: stretch; }
+            .btn { justify-content: center; }
+            .proof-grid { grid-template-columns: repeat(2, 1fr); }
+            .usecases-grid { grid-template-columns: 1fr; }
+            .workflow-steps { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: 1fr; }
+            .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+            .container { padding: 0 16px; }
+            .section { padding: 64px 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container nav-inner">
+            <a href="#" class="logo">
+                <span class="logo-mark">B</span>
+                Bonjou
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#workflow">Workflow</a>
+                <a href="#security">Security</a>
+                <a href="#install">Install</a>
+                <a href="#faq">FAQ</a>
+            </div>
+            <a href="https://github.com/hamzaabdulwahab/bonjou-cli" class="nav-cta" target="_blank" rel="noopener">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.275.098-2.65 0 0 .84-.27 2.75 1.026A9.28 9.28 0 0112 6.156c.85 0 1.7.114 2.5.336 1.91-1.296 2.747-1.027 2.747-1.027.546 1.375.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                GitHub
+            </a>
+            <button class="mobile-menu-btn" aria-label="Menu">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-bg"></div>
+        <div class="container">
+            <div class="hero-layout">
+                <div class="hero-content">
+                    <div class="hero-eyebrow">
+                        <span></span>
+                        Serverless LAN Chat & File Transfer
+                    </div>
+                    <h1>Move files. <em>No cloud.</em></h1>
+                    <p class="hero-desc">
+                        Bonjou is a terminal-first tool for local network chat and file transfer. No servers, no accounts, no internet required. Just open your terminal and start sharing.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#install" class="btn btn-primary">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Install Free
+                        </a>
+                        <a href="#features" class="btn btn-secondary">
+                            See How It Works
+                        </a>
+                    </div>
+                    <p class="hero-terms">MIT Licensed &middot; v1.2.0 &middot; macOS, Linux, Windows</p>
+                </div>
+                <div class="hero-terminal">
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="term-dot red"></span>
+                            <span class="term-dot yellow"></span>
+                            <span class="term-dot green"></span>
+                            <span class="terminal-title">bonjou</span>
+                        </div>
+                        <div class="terminal-body">
+                            <div><span class="term-prompt">$</span> <span class="term-input">bonjou</span></div>
+                            <div></div>
+                            <div><span class="term-comment"># Discover peers on your LAN</span></div>
+                            <div>bonjou&gt; <span class="term-cmd">@users</span></div>
+                            <div><span class="term-user">  alex</span> <span class="term-comment">192.168.1.42 (2s ago)</span></div>
+                            <div><span class="term-user">  sam</span> <span class="term-comment">192.168.1.87 (5s ago)</span></div>
+                            <div></div>
+                            <div><span class="term-comment"># Send a file</span></div>
+                            <div>bonjou&gt; <span class="term-cmd">@file alex ~/report.pdf</span></div>
+                            <div><span class="term-success">✓</span> <span class="term-comment">Transfer offer sent. Waiting for approval...</span></div>
+                            <div></div>
+                            <div><span class="term-comment"># Approve incoming</span></div>
+                            <div>bonjou&gt; <span class="term-cmd">@queue</span></div>
+                            <div><span class="term-warn">[1]</span> <span class="term-comment">report.pdf (2.4 MB) from alex</span></div>
+                            <div>bonjou&gt; <span class="term-cmd">@approve 1</span><span class="typing-cursor"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Proof Strip -->
+    <section class="proof-strip">
+        <div class="container">
+            <div class="proof-grid">
+                <div class="proof-item">
+                    <div class="proof-icon">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <div>
+                        <h4>Local-First</h4>
+                        <p>UDP broadcast discovery on your subnet. No cloud relay.</p>
+                    </div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-icon">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div>
+                        <h4>Approval-First</h4>
+                        <p>Every transfer requires explicit approval before write.</p>
+                    </div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-icon">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    </div>
+                    <div>
+                        <h4>Encrypted</h4>
+                        <p>AES-256-GCM with X25519 key exchange and TOFU pinning.</p>
+                    </div>
+                </div>
+                <div class="proof-item">
+                    <div class="proof-icon">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </div>
+                    <div>
+                        <h4>Cross-Platform</h4>
+                        <p>Native binaries for macOS, Linux, and Windows.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">features</div>
+                <h2>Built for real local work</h2>
+                <p>Everything you need to move messages and files across a local network, without the overhead of cloud services or shared drives.</p>
+            </div>
+            <div class="usecases-grid">
+                <div class="usecase-card">
+                    <div class="usecase-tag">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                        Discovery
+                    </div>
+                    <h3>Auto-Discover Peers</h3>
+                    <p>Bonjou uses UDP broadcast to automatically find other users on your subnet. No configuration, no manual IP entry. Just run and connect.</p>
+                </div>
+                <div class="usecase-card">
+                    <div class="usecase-tag">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        Chat
+                    </div>
+                    <h3>Terminal Chat</h3>
+                    <p>Send direct messages, multi-recipient messages, or broadcasts to everyone on the network. All from simple @ commands in your terminal.</p>
+                </div>
+                <div class="usecase-card">
+                    <div class="usecase-tag">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Transfer
+                    </div>
+                    <h3>Files & Folders</h3>
+                    <p>Send a single file or an entire directory with @file and @folder commands. The receiver inspects metadata before approving.</p>
+                </div>
+                <div class="usecase-card">
+                    <div class="usecase-tag">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        Approval
+                    </div>
+                    <h3>Metadata-First Queue</h3>
+                    <p>Incoming transfers enter a pending queue. View file names, sizes, and senders before writing a single byte to disk. Full control.</p>
+                </div>
+                <div class="usecase-card">
+                    <div class="usecase-tag">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        Wizard
+                    </div>
+                    <h3>Guided Wizard Mode</h3>
+                    <p>Prefer menus over commands? The @wizard guides you through message, file, folder, and broadcast flows interactively.</p>
+                </div>
+                <div class="usecase-card">
+                    <div class="usecase-tag">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Security
+                    </div>
+                    <h3>Trust Controls</h3>
+                    <p>Inspect, replace, or remove pinned peer keys. TOFU identity pinning with @known, @fingerprint, @trust, and @forget commands.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow -->
+    <section class="section workflow-section" id="workflow">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">workflow</div>
+                <h2>Discover, send, inspect, approve</h2>
+                <p>Four steps from zero to file transfer. No setup, no configuration, no accounts.</p>
+            </div>
+            <div class="workflow-steps">
+                <div class="step">
+                    <h3>Run Bonjou</h3>
+                    <p>Start the CLI on any machine connected to the same Wi-Fi or LAN.</p>
+                    <div class="step-code">$ bonjou</div>
+                </div>
+                <div class="step">
+                    <h3>Discover Peers</h3>
+                    <p>List all discovered users with last-seen timestamps.</p>
+                    <div class="step-code">@users</div>
+                </div>
+                <div class="step">
+                    <h3>Send Payload</h3>
+                    <p>Use a username or IP for chat, file, folder, or broadcast flows.</p>
+                    <div class="step-code">@file alex ~/report.pdf</div>
+                </div>
+                <div class="step">
+                    <h3>Approve Items</h3>
+                    <p>Inspect pending metadata before accepting any file or folder.</p>
+                    <div class="step-code">@view 1<br>@approve 1</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Demo -->
+    <section class="section product-section" id="features">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">product</div>
+                <h2>See it in action</h2>
+                <p>A terminal-first experience designed for speed and control.</p>
+            </div>
+            <div class="product-terminal">
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="term去吃" style="display:none;"></span>
+                        <span class="term-dot red"></span>
+                        <span class="term-dot yellow"></span>
+                        <span class="term-dot green"></span>
+                        <span class="terminal-title">bonjou</span>
+                    </div>
+                    <div class="terminal-body">
+                        <img src="/bonjou-demo.gif" alt="Bonjou terminal demo showing discovery, messaging, file transfer, and approval workflow" style="width:100%;border-radius:4px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+                        <div style="display:none;font-family:var(--font-mono);font-size:0.85rem;color:var(--slate-300);line-height:1.8;">
+                            <div>bonjou&gt; <span style="color:#c4b5fd">@users</span></div>
+                            <div>  <span style="color:#60a5fa">alex</span> <span style="color:var(--slate-500)">192.168.1.42 (1s ago)</span></div>
+                            <div>  <span style="color:#60a5fa">sam</span> <span style="color:var(--slate-500)">192.168.1.87 (3s ago)</span></div>
+                            <div></div>
+                            <div>bonjou&gt; <span style="color:#c4b5fd">@send alex</span> Meeting notes are ready</div>
+                            <div><span style="color:#34d399">✓</span> <span style="color:var(--slate-500)">Sent to alex</span></div>
+                            <div></div>
+                            <div>bonjou&gt; <span style="color:#c4b5fd">@file sam ~/designs.zip</span></div>
+                            <div><span style="color:#34d399">✓</span> <span style="color:var(--slate-500)">Transfer offer sent. Waiting for approval...</span></div>
+                            <div></div>
+                            <div>bonjou&gt; <span style="color:#c4b5fd">@queue</span></div>
+                            <div><span style="color:#fbbf24">[1]</span> <span style="color:var(--slate-500)">designs.zip (14.2 MB) from sam</span></div>
+                            <div>bonjou&gt; <span style="color:#c4b5fd">@approve 1</span></div>
+                            <div><span style="color:#34d399">✓</span> <span style="color:var(--slate-500)">Received designs.zip (14.2 MB)</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security -->
+    <section class="section" id="security">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">security</div>
+                <h2>Security claims with stated limits</h2>
+                <p>What Bonjou protects and what it does not. Full transparency from the repository security model.</p>
+            </div>
+            <div class="security-grid">
+                <div class="protected">
+                    <div class="security-card">
+                        <h3>
+                            <svg class="check-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            What is Protected
+                        </h3>
+                        <p>Protocol v2 protections as documented in the security model.</p>
+                        <ul class="security-list">
+                            <li>
+                                <svg class="check-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                AES-256-GCM authenticated encryption for every envelope
+                            </li>
+                            <li>
+                                <svg class="check-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                Per-chunk stream authentication for corruption detection
+                            </li>
+                            <li>
+                                <svg class="check-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                Trust-on-first-use (TOFU) peer identity pinning
+                            </li>
+                            <li>
+                                <svg class="check-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                Replay rejection with per-peer nonce cache
+                            </li>
+                            <li>
+                                <svg class="check-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                Path safety checks confine writes to receive root
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="limited">
+                    <div class="security-card">
+                        <h3>
+                            <svg class="warn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Known Limitations
+                        </h3>
+                        <p>Honest limits from the current security model.</p>
+                        <ul class="security-list">
+                            <li>
+                                <svg class="warn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                Forward secrecy is not yet available
+                            </li>
+                            <li>
+                                <svg class="warn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                config.json stored on disk in plaintext (mode 0600)
+                            </li>
+                            <li>
+                                <svg class="warn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                Chat content logged in plaintext to chat.log
+                            </li>
+                            <li>
+                                <svg class="warn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                Discovery is same-subnet only (no routers/VLANs)
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Install -->
+    <section class="section install-section" id="install">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">install</div>
+            </div>
+        </div>
+    </section>

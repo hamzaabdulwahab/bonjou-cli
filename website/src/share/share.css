@@ -5,10 +5,11 @@
    a physical object on the page, not a screenshot of one, so the page
    is bright and the tool is not.
 
-   Type: Archivo carries display and body. One family, wide widths and
-   heavy weights for headings, so the voice comes from width and weight
-   contrast rather than a second typeface. Martian Mono handles readouts:
-   codes, fingerprints, byte counts.
+   Type: Schibsted Grotesk carries display and body, with hierarchy from
+   weight and size alone. No synthetic width stretching. JetBrains Mono is
+   reserved for things that are literally data: codes, byte counts, shell
+   commands. Labels are small-caps sans, because a wide mono set in caps
+   at 10px is hard to read and looks like a readout for its own sake.
 
    Color: committed vermilion. It marks one thing only, presence, and is
    never used decoratively. If it glows, someone is there.
@@ -37,9 +38,9 @@
   --wire: oklch(88% 0.012 250);
   --good: oklch(62% 0.15 155);
 
-  --display: "Archivo", ui-sans-serif, system-ui, sans-serif;
-  --body: "Archivo", ui-sans-serif, system-ui, sans-serif;
-  --mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --body: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --gutter: clamp(1.25rem, 4vw, 4rem);
   --measure: 68ch;
@@ -89,8 +90,7 @@ h2,
 h3 {
   font-family: var(--display);
   font-weight: 800;
-  font-stretch: 112%;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.028em;
   line-height: 1.02;
   margin: 0;
   text-wrap: balance;
@@ -107,8 +107,7 @@ h2 {
 h3 {
   font-size: clamp(1.05rem, 0.98rem + 0.4vw, 1.25rem);
   font-weight: 700;
-  font-stretch: 100%;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.012em;
   line-height: 1.2;
 }
 
@@ -128,10 +127,9 @@ a:hover {
 }
 
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -181,9 +179,8 @@ a:hover {
 .wordmark {
   font-family: var(--display);
   font-weight: 800;
-  font-stretch: 118%;
-  font-size: 1.15rem;
-  letter-spacing: -0.04em;
+  font-size: 1.2rem;
+  letter-spacing: -0.035em;
   text-decoration: none;
 }
 
@@ -256,10 +253,8 @@ section:first-of-type {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1.75rem;
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.8rem;
+  font-weight: 500;
   color: var(--ink-3);
 }
 
@@ -284,10 +279,9 @@ section:first-of-type {
   padding: 0.7rem 1.1rem;
   background: var(--panel-2);
   border-bottom: 1px solid var(--panel-line);
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   color: var(--panel-dim);
 }
 
@@ -311,9 +305,9 @@ section:first-of-type {
 }
 
 .pane-label {
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.13em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--panel-dim);
   margin-bottom: 0.85rem;
@@ -399,7 +393,6 @@ section:first-of-type {
   flex: 1;
   min-width: 0;
   font-weight: 600;
-  font-size: 0.9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -407,20 +400,15 @@ section:first-of-type {
 
 .node-tag {
   flex: none;
-  font-family: var(--mono);
-  font-size: 0.52rem;
-  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--panel-dim);
 }
 
-.fingerprint {
-  display: block;
-  font-family: var(--mono);
-  font-size: 0.56rem;
-  letter-spacing: -0.01em;
-  color: var(--panel-dim);
-  margin-top: 0.15rem;
+.node-name {
+  font-size: 0.95rem;
 }
 
 .everyone {
@@ -584,10 +572,9 @@ button.link:hover:not(:disabled) {
 }
 
 .entry-who {
-  font-family: var(--mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: var(--panel-dim);
 }
 
@@ -616,10 +603,8 @@ button.link:hover:not(:disabled) {
 }
 
 .state {
-  font-family: var(--mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 500;
   color: var(--panel-dim);
 }
 
@@ -691,6 +676,7 @@ button.link:hover:not(:disabled) {
 .reach-more input,
 .room input {
   flex: 1 1 9rem;
+  font-size: 0.8rem;
   min-width: 0;
   padding: 0.45rem 0.6rem;
   background: var(--panel);
@@ -698,7 +684,6 @@ button.link:hover:not(:disabled) {
   border-radius: 7px;
   color: var(--panel-text);
   font-family: var(--mono);
-  font-size: 0.72rem;
 }
 
 .notice {
@@ -766,7 +751,7 @@ button.link:hover:not(:disabled) {
   counter-increment: step;
   content: counter(step, decimal-leading-zero);
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   color: var(--signal);
   padding-top: 0.25rem;
 }
@@ -840,7 +825,7 @@ button.link:hover:not(:disabled) {
   color: var(--panel-text);
   border-radius: 9px;
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   overflow-x: auto;
 }
 
