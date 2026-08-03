@@ -162,12 +162,17 @@ export function useSession(name: string, active: boolean) {
 
         case "created":
           setCode(event.code);
+          // Entering a room resolves whatever the last complaint was,
+          // most often a failed join of an expired code. Leaving it up
+          // would have the banner contradict the room shown beside it.
+          setNotice("");
           window.history.replaceState(null, "", `/r/${event.code}`);
           break;
 
         case "joined":
           if (event.code) {
             setCode(event.code);
+            setNotice("");
             window.history.replaceState(null, "", `/r/${event.code}`);
           }
           break;
@@ -210,6 +215,12 @@ export function useSession(name: string, active: boolean) {
           if (event.code === "network_busy") {
             setNetworkGrouped(false);
             break;
+          }
+          if (event.code === "no_room") {
+            // The code in the address bar is dead. Drop it so a reload
+            // does not fail the same way, and so "Open a room" is offered.
+            window.history.replaceState(null, "", "/");
+            setCode("");
           }
           setNotice(event.message);
           break;

@@ -97,6 +97,23 @@ export function Instrument(props: InstrumentProps) {
   const allSelected = peers.length > 0 && selected.length === peers.length;
   const canSend = selected.length > 0;
 
+  // Names come from localStorage, which every tab of a browser shares, so
+  // several peers legitimately arrive called the same thing. Add the
+  // leading fingerprint bytes only to the ones that collide, so unique
+  // names stay clean.
+  const labels = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const peer of peers) counts.set(peer.name, (counts.get(peer.name) ?? 0) + 1);
+    const out: Record<string, string> = {};
+    for (const peer of peers) {
+      out[peer.id] =
+        (counts.get(peer.name) ?? 0) > 1
+          ? `${peer.name} ${(fingerprints[peer.id] ?? peer.id).slice(0, 5)}`
+          : peer.name;
+    }
+    return out;
+  }, [peers, fingerprints]);
+
   if (!name) {
     return (
       <div className="instrument">
@@ -161,7 +178,7 @@ export function Instrument(props: InstrumentProps) {
                   >
                     <span className="blip" aria-hidden="true" />
                     <span className="node-name">
-                      {peer.name}
+                      {labels[peer.id] ?? peer.name}
                       <span className="fingerprint">{fingerprints[peer.id] ?? "…"}</span>
                     </span>
                     <span className="node-tag">
@@ -288,7 +305,7 @@ export function Instrument(props: InstrumentProps) {
                 Sending to {selected.length === peers.length && peers.length > 1
                   ? `everyone (${peers.length})`
                   : selected
-                      .map((id) => peers.find((p) => p.id === id)?.name)
+                      .map((id) => labels[id])
                       .filter(Boolean)
                       .join(", ")}
               </p>
@@ -324,7 +341,7 @@ export function Instrument(props: InstrumentProps) {
                 {incoming.map((item) => (
                   <div key={item.requestId} className="entry">
                     <div className="entry-head">
-                      <span className="entry-who">from {item.fromName}</span>
+                      <span className="entry-who">from {labels[item.from] ?? item.fromName}</span>
                       <span className="entry-size">{formatBytes(item.size)}</span>
                     </div>
                     <div className="entry-name">{item.name}</div>
@@ -348,7 +365,7 @@ export function Instrument(props: InstrumentProps) {
                 {outgoing.map((item) => (
                   <div key={item.requestId} className="entry">
                     <div className="entry-head">
-                      <span className="entry-who">to {item.peerName}</span>
+                      <span className="entry-who">to {labels[item.peerId] ?? item.peerName}</span>
                       <span className="entry-size">{formatBytes(item.file.size)}</span>
                     </div>
                     <div className="entry-name">{item.label}</div>
