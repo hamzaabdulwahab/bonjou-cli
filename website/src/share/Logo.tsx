@@ -1,13 +1,29 @@
 /**
- * The mark: a geometric b cut into a solid tile.
+ * The mark: a geometric b on a solid tile.
  *
- * An app icon rather than an outline glyph, because the previous mark
- * read as the standard wifi symbol at small sizes and so said nothing
- * about this product in particular. A filled tile holds its shape at
- * 16px, survives being a favicon, and matches Manrope's roundness in the
- * bowl and the corner radius.
+ * Drawn with filled shapes rather than strokes. The previous version
+ * stroked a line and a circle that overlapped by 2.25px, so the join
+ * between stem and bowl piled up two strokes and read as a smudge at
+ * small sizes.
+ *
+ * The geometry is deliberate and worth preserving if this is ever
+ * adjusted:
+ *
+ *   - The glyph is centred in the tile. Stem and bowl together span
+ *     x 6.8 to 17.3 and y 4.4 to 19.6, both centred on 12.
+ *   - Stem and bowl share a baseline at y 19.6, so the letter sits flat
+ *     rather than the bowl hanging below the stem.
+ *   - The bowl's ring is 2.6 wide, the same as the stem, so the whole
+ *     letter carries one weight. That single fact is most of what makes
+ *     a constructed letterform look drawn rather than assembled.
+ *
+ * The counter is painted back in the tile colour rather than punched out
+ * with a fill rule, which keeps the shapes independent and avoids the
+ * winding-order artefacts an even-odd union produces where stem and bowl
+ * overlap.
  */
 export function Logo({ size = 22, tone }: { size?: number; tone?: string }) {
+  const ink = tone ?? "var(--paper)";
   return (
     <svg
       width={size}
@@ -18,19 +34,9 @@ export function Logo({ size = 22, tone }: { size?: number; tone?: string }) {
       focusable="false"
     >
       <rect width="24" height="24" rx="6.75" fill="currentColor" />
-      <path
-        d="M8.55 4.6v14.5"
-        stroke={tone ?? "var(--paper)"}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <circle
-        cx="13.35"
-        cy="14.55"
-        r="4.55"
-        stroke={tone ?? "var(--paper)"}
-        strokeWidth="2.5"
-      />
+      <rect x="6.8" y="4.4" width="2.6" height="15.2" rx="1.3" fill={ink} />
+      <circle cx="12.3" cy="14.6" r="5" fill={ink} />
+      <circle cx="12.3" cy="14.6" r="2.4" fill="currentColor" />
     </svg>
   );
 }
