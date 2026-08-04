@@ -56,6 +56,11 @@ type Manager struct {
 
 	baseDir      string
 	snapshotPath string
+
+	// persistErr holds the most recent snapshot write failure. Adds keep
+	// their item in memory regardless, so this records that the queue is
+	// live but not durable rather than that anything was lost.
+	persistErr error
 }
 
 func NewManager(baseDir string) (*Manager, error) {
@@ -99,10 +104,13 @@ func (m *Manager) AddFile(requestID, sender, senderIP, name string, size int64, 
 	}
 
 	m.files[id] = item
+	// A failed snapshot write must not discard a live offer. The in-memory
+	// queue is the authority; the file on disk exists so a restart can
+	// recover, and losing a real transfer because a disk write hiccuped is
+	// the worse of the two failures. The error is retained so Flush and
+	// Close can report it.
 	if err := m.saveLocked(); err != nil {
-		delete(m.files, id)
-		m.nextID--
-		return 0, err
+		m.persistErr = err
 	}
 	return id, nil
 }
@@ -130,10 +138,9 @@ func (m *Manager) AddFolder(requestID, sender, senderIP, name string, size int64
 	}
 
 	m.folders[id] = item
+	// See AddFile: persistence failure never costs us a pending offer.
 	if err := m.saveLocked(); err != nil {
-		delete(m.folders, id)
-		m.nextID--
-		return 0, err
+		m.persistErr = err
 	}
 	return id, nil
 }
@@ -225,6 +232,15 @@ func (m *Manager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.saveLocked()
+}
+
+// PersistError reports the most recent snapshot write failure, if any.
+// The queue keeps working when persistence fails, so this is how a caller
+// learns that pending items would not survive a restart.
+func (m *Manager) PersistError() error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.persistErr
 }
 
 func (m *Manager) Flush() error {

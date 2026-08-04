@@ -863,3 +863,149 @@ func listOutgoingApprovalsForCommands(transfer *network.TransferService) map[str
 	}
 	return out
 }
+
+// The reported failure: reject a folder, then @approveAll, and the files
+// that were still pending never arrive. approveAll must resume from a
+// queue that a previous rejection has already mutated.
+func TestApproveAllAfterFolderRejectionStillDeliversPendingFiles(t *testing.T) {
+	sender, receiver := newCommandTransferPair(t)
+
+	firstPath := filepath.Join(sender.cfg.BaseDir, "fixtures", "keep-one.txt")
+	secondPath := filepath.Join(sender.cfg.BaseDir, "fixtures", "keep-two.txt")
+	folderPath := filepath.Join(sender.cfg.BaseDir, "fixtures", "drop-me")
+	writeFileStringForCommands(t, firstPath, "first survives the rejection")
+	writeFileStringForCommands(t, secondPath, "second survives the rejection")
+	writeFileStringForCommands(t, filepath.Join(folderPath, "inside.txt"), "folder payload")
+
+	receiverPeer := peerForCommandsHarness(t, receiver)
+	if err := sender.transfer.SendFile(receiverPeer, firstPath); err != nil {
+		t.Fatalf("SendFile(first): %v", err)
+	}
+	if err := sender.transfer.SendFolder(receiverPeer, folderPath); err != nil {
+		t.Fatalf("SendFolder: %v", err)
+	}
+	if err := sender.transfer.SendFile(receiverPeer, secondPath); err != nil {
+		t.Fatalf("SendFile(second): %v", err)
+	}
+
+	waitForPendingFileCountForCommands(t, receiver.queue, 2)
+	folderID := waitForPendingFolderCountForCommands(t, receiver.queue, 1)
+
+	handler := New(receiver.session)
+
+	// Reject the folder from the middle of the queue.
+	if _, err := handler.Handle(fmt.Sprintf("@reject %d", folderID)); err != nil {
+		t.Fatalf("Handle(@reject folder): %v", err)
+	}
+
+	result, err := handler.Handle("@approveAll")
+	if err != nil {
+		t.Fatalf("Handle(@approveAll): %v", err)
+	}
+	if !strings.Contains(result.Output, "Approved 2 queued items.") {
+		t.Fatalf("approveAll after rejection = %q, want both remaining files approved", result.Output)
+	}
+
+	waitForNoPendingFilesForCommands(t, receiver.queue)
+	waitForFileContentForCommands(t,
+		filepath.Join(receiver.cfg.ReceivedFilesDir, "keep-one.txt"),
+		"first survives the rejection")
+	waitForFileContentForCommands(t,
+		filepath.Join(receiver.cfg.ReceivedFilesDir, "keep-two.txt"),
+		"second survives the rejection")
+}
+
+// @queue has to describe the queue as it actually is after a partial
+// approval, not as it was when the offers arrived.
+func TestQueueOutputReflectsPartialResolution(t *testing.T) {
+	sender, receiver := newCommandTransferPair(t)
+
+	keepPath := filepath.Join(sender.cfg.BaseDir, "fixtures", "still-waiting.txt")
+	gonePath := filepath.Join(sender.cfg.BaseDir, "fixtures", "already-handled.txt")
+	writeFileStringForCommands(t, keepPath, "still waiting payload")
+	writeFileStringForCommands(t, gonePath, "already handled payload")
+
+	receiverPeer := peerForCommandsHarness(t, receiver)
+	if err := sender.transfer.SendFile(receiverPeer, gonePath); err != nil {
+		t.Fatalf("SendFile(gone): %v", err)
+	}
+	if err := sender.transfer.SendFile(receiverPeer, keepPath); err != nil {
+		t.Fatalf("SendFile(keep): %v", err)
+	}
+	waitForPendingFileCountForCommands(t, receiver.queue, 2)
+
+	handler := New(receiver.session)
+	before, err := handler.Handle("@queue")
+	if err != nil {
+		t.Fatalf("Handle(@queue) before: %v", err)
+	}
+	if !strings.Contains(before.Output, "still-waiting.txt") ||
+		!strings.Contains(before.Output, "already-handled.txt") {
+		t.Fatalf("@queue before resolution missing an item: %q", before.Output)
+	}
+
+	files := receiver.queue.ListFiles()
+	var goneID int
+	for _, f := range files {
+		if f.Name == "already-handled.txt" {
+			goneID = f.ID
+		}
+	}
+	if goneID == 0 {
+		t.Fatal("could not find the offer to reject")
+	}
+	if _, err := handler.Handle(fmt.Sprintf("@reject %d", goneID)); err != nil {
+		t.Fatalf("Handle(@reject): %v", err)
+	}
+
+	after, err := handler.Handle("@queue")
+	if err != nil {
+		t.Fatalf("Handle(@queue) after: %v", err)
+	}
+	if strings.Contains(after.Output, "already-handled.txt") {
+		t.Fatalf("@queue still lists a rejected offer: %q", after.Output)
+	}
+	if !strings.Contains(after.Output, "still-waiting.txt") {
+		t.Fatalf("@queue dropped the offer that is still pending: %q", after.Output)
+	}
+}
+
+// Offers arriving back to back must all reach the queue. A snapshot write
+// failing, or one send overtaking another, previously lost them silently.
+func TestRapidOffersAllReachTheQueue(t *testing.T) {
+	sender, receiver := newCommandTransferPair(t)
+
+	const count = 6
+	receiverPeer := peerForCommandsHarness(t, receiver)
+	for i := 0; i < count; i++ {
+		path := filepath.Join(sender.cfg.BaseDir, "fixtures", fmt.Sprintf("burst-%d.txt", i))
+		writeFileStringForCommands(t, path, fmt.Sprintf("burst payload %d", i))
+		if err := sender.transfer.SendFile(receiverPeer, path); err != nil {
+			t.Fatalf("SendFile(%d): %v", i, err)
+		}
+	}
+
+	waitForPendingFileCountForCommands(t, receiver.queue, count)
+
+	handler := New(receiver.session)
+	result, err := handler.Handle("@queue")
+	if err != nil {
+		t.Fatalf("Handle(@queue): %v", err)
+	}
+	for i := 0; i < count; i++ {
+		name := fmt.Sprintf("burst-%d.txt", i)
+		if !strings.Contains(result.Output, name) {
+			t.Fatalf("@queue is missing %s after a burst of offers: %q", name, result.Output)
+		}
+	}
+
+	// IDs are handed out from one counter shared by files and folders, so
+	// a burst must not produce a duplicate.
+	seen := map[int]bool{}
+	for _, f := range receiver.queue.ListFiles() {
+		if seen[f.ID] {
+			t.Fatalf("duplicate queue id %d", f.ID)
+		}
+		seen[f.ID] = true
+	}
+}

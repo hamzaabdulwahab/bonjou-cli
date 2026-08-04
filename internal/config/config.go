@@ -39,7 +39,7 @@ type Config struct {
 	// accept from a peer. A malicious sender can claim env.Size = 1<<60 to
 	// force the receive loop to read forever; this cap bounds the damage.
 	// Zero/negative means "use default" (defaultMaxIncomingBytes).
-	MaxIncomingBytes int64 `json:"max_incoming_bytes,omitempty"`
+	MaxIncomingBytes int64  `json:"max_incoming_bytes,omitempty"`
 	configPath       string `json:"-"`
 }
 

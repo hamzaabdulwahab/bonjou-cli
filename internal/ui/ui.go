@@ -172,7 +172,7 @@ func (u *UI) Run() {
 		_ = u.rl.SaveHistory(line)
 		result, err := u.handler.Handle(line)
 		if err != nil {
-			u.writeLine(colorError + err.Error() + colorReset)
+			u.writeResult(colorError + err.Error() + colorReset)
 			continue
 		}
 		if result.Clear {
@@ -180,7 +180,7 @@ func (u *UI) Run() {
 			continue
 		}
 		if result.Output != "" {
-			u.writeLine(colorSuccess + result.Output + colorReset)
+			u.writeResult(colorSuccess + result.Output + colorReset)
 		}
 		if result.Quit {
 			u.shutdown()
@@ -319,6 +319,18 @@ func (u *UI) shutdown() {
 		close(u.done)
 	}
 	u.writeLine(colorMuted + "Ending Bonjou session. Goodbye!" + colorReset)
+}
+
+// writeResult prints one command's output and then a blank line, so that
+// running two commands in a row does not produce one undifferentiated
+// block of text above the next prompt.
+//
+// Trailing newlines are trimmed first: a result that already ends in one
+// would otherwise leave a double gap, while a result with deliberate
+// internal blank lines keeps them.
+func (u *UI) writeResult(text string) {
+	u.writeLine(strings.TrimRight(text, "\n"))
+	u.writeLine("")
 }
 
 func (u *UI) writeLine(line string) {

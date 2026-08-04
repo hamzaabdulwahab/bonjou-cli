@@ -252,4 +252,3 @@ func (h *Handler) cmdExit() (Result, error) {
 		),
 	}, nil
 }
-

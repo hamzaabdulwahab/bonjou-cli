@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -150,5 +151,92 @@ func TestManagerLoadDropsInvalidNamesAndKeepsSnapshotReadable(t *testing.T) {
 
 	if got := len(reloaded.ListFiles()); got != 1 {
 		t.Fatalf("len(ListFiles()) = %d, want 1", got)
+	}
+}
+
+// A pending offer is live state. If the snapshot cannot be written the
+// queue is no longer durable, but discarding the offer turns a recoverable
+// disk problem into a lost transfer the user was never told about.
+func TestAddKeepsItemWhenSnapshotWriteFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root bypasses the permission that makes the write fail")
+	}
+	base := t.TempDir()
+	mgr, err := NewManager(base)
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	// Make the snapshot directory unwritable so saveLocked fails.
+	dir := filepath.Join(base, pendingDirName)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("Chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	id, err := mgr.AddFile("req-1", "ada", "192.0.2.1", "important.pdf", 1024, "")
+	if err != nil {
+		t.Fatalf("AddFile returned an error when only persistence failed: %v", err)
+	}
+	if id == 0 {
+		t.Fatal("AddFile returned no id")
+	}
+
+	item, err := mgr.GetFile(id)
+	if err != nil {
+		t.Fatalf("the offer was discarded when the snapshot write failed: %v", err)
+	}
+	if item.Name != "important.pdf" {
+		t.Fatalf("item name = %q", item.Name)
+	}
+	if len(mgr.ListFiles()) != 1 {
+		t.Fatalf("ListFiles = %d, want 1", len(mgr.ListFiles()))
+	}
+
+	// The failure is still reported, so a caller can say the queue will
+	// not survive a restart.
+	if mgr.PersistError() == nil {
+		t.Error("PersistError is nil after a failed snapshot write")
+	}
+}
+
+// Files and folders draw ids from one counter, so an id identifies
+// exactly one pending item whichever kind it is.
+func TestFileAndFolderIDsShareOneSequence(t *testing.T) {
+	mgr, err := NewManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	seen := map[int]bool{}
+	for i := 0; i < 5; i++ {
+		fileID, err := mgr.AddFile("f", "ada", "192.0.2.1", "file.txt", 10, "")
+		if err != nil {
+			t.Fatalf("AddFile: %v", err)
+		}
+		folderID, err := mgr.AddFolder("d", "ada", "192.0.2.1", "folder", 10, "")
+		if err != nil {
+			t.Fatalf("AddFolder: %v", err)
+		}
+		for _, id := range []int{fileID, folderID} {
+			if seen[id] {
+				t.Fatalf("id %d handed out twice", id)
+			}
+			seen[id] = true
+		}
+	}
+
+	// Removing one kind must not disturb the other.
+	files := mgr.ListFiles()
+	if err := mgr.RemoveFile(files[0].ID); err != nil {
+		t.Fatalf("RemoveFile: %v", err)
+	}
+	if got := len(mgr.ListFiles()); got != 4 {
+		t.Fatalf("ListFiles after remove = %d, want 4", got)
+	}
+	if got := len(mgr.ListFolders()); got != 5 {
+		t.Fatalf("ListFolders after removing a file = %d, want 5", got)
 	}
 }

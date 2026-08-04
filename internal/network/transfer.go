@@ -591,12 +591,30 @@ func (t *TransferService) sendRejection(kind, requestID, name, sender, senderIP 
 	return nil
 }
 
+// emitOfferRejected tells the user an offer arrived and could not be
+// queued. Silence here reads as a dropped transfer with no explanation,
+// which is indistinguishable from the network failing.
+func (t *TransferService) emitOfferRejected(kind, from, name string, cause error) {
+	t.emit(events.Event{
+		Type:      events.Error,
+		Title:     "Incoming " + kind + " refused",
+		Message:   fmt.Sprintf("Could not queue %s from %s: %v", name, from, cause),
+		From:      from,
+		Timestamp: time.Now(),
+		Level:     "error",
+	})
+}
+
 func (t *TransferService) receiveFileOffer(env *envelope) error {
 	if err := t.validateIncomingSize(env.Size, "file"); err != nil {
 		return err
 	}
 	queueID, err := t.queue.AddFile(env.RequestID, env.From, env.FromIP, env.Name, env.Size, "")
 	if err != nil {
+		// Returning here used to be the whole story, which meant a
+		// refused offer produced no queue entry and no notification: the
+		// sender saw it leave and the receiver saw nothing at all.
+		t.emitOfferRejected("file", env.From, env.Name, err)
 		return err
 	}
 	displayMsg := fmt.Sprintf(
@@ -627,6 +645,7 @@ func (t *TransferService) receiveFolderOffer(env *envelope) error {
 	}
 	queueID, err := t.queue.AddFolder(env.RequestID, env.From, env.FromIP, env.Name, env.Size, env.Message)
 	if err != nil {
+		t.emitOfferRejected("folder", env.From, env.Name, err)
 		return err
 	}
 	displayMsg := fmt.Sprintf(
@@ -2060,4 +2079,3 @@ func ensurePathWithinRoot(path, root string) error {
 func formatSize(size int64) string {
 	return format.Size(size)
 }
-
