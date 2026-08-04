@@ -26,8 +26,9 @@ import {
   registerServiceWorker,
   serviceWorkerSupported,
   startDownload,
-  uploadFile,
+  uploadStream,
 } from "./transfer";
+import { entriesFor, folderNameFor, zipSize, zipStream } from "./zip";
 
 export const RELAY_BASE = (
   import.meta.env.VITE_RELAY_URL ?? "https://bonjou.80-225-228-65.sslip.io"
@@ -48,7 +49,14 @@ export interface OutgoingItem {
   requestId: string;
   peerId: string;
   peerName: string;
-  file: File;
+  /** Plaintext bytes this send will produce. */
+  size: number;
+  /**
+   * Opens the plaintext afresh. A function rather than a stream because
+   * each recipient needs its own: a folder is zipped per transfer, and a
+   * stream cannot be read twice.
+   */
+  openStream: () => ReadableStream<Uint8Array>;
   label: string;
   streamId: Uint8Array;
   state: OutgoingState;
@@ -74,6 +82,8 @@ export interface IncomingItem {
   state: IncomingState;
   error?: string;
   at: number;
+  /** Extra human detail from the sender, such as a folder's file count. */
+  note?: string;
 }
 
 export interface ChatLine {
@@ -180,7 +190,7 @@ export function useSession(name: string, active: boolean) {
       }
       busyPeers.current.add(item.peerId);
       patchOutgoing(requestId, { state: "sending" });
-      client.beginTransfer(item.peerId, cipherSizeFor(item.file.size));
+      client.beginTransfer(item.peerId, cipherSizeFor(item.size));
     }
     queued.current = stillQueued;
   }, [patchOutgoing]);
@@ -323,6 +333,7 @@ export function useSession(name: string, active: boolean) {
           streamId: envelope.stream_id ?? "",
           state: "pending",
           at: Date.now(),
+          note: envelope.message || undefined,
         };
         incomingRef.current.set(item.requestId, item);
         syncIncoming();
@@ -369,11 +380,12 @@ export function useSession(name: string, active: boolean) {
           const streamKey = await importAesKey(
             await deriveStreamKey(shared, item.streamId),
           );
-          await uploadFile({
+          await uploadStream({
             relayBase: RELAY_BASE,
             transferId: event.transferId,
             token: event.token,
-            file: item.file,
+            source: item.openStream(),
+            totalBytes: item.size,
             streamKey,
             onProgress: (sent) => patchOutgoing(item.requestId, { sentBytes: sent }),
           });
@@ -462,32 +474,49 @@ export function useSession(name: string, active: boolean) {
       const client = clientRef.current;
       if (!client || targets.length === 0 || files.length === 0) return;
 
-      // One group per file, spanning its recipients.
-      const groups = new Map<File, string>();
-      for (const file of files) groups.set(file, toHex(randomBytes(6)));
+      // A folder becomes exactly one payload. Offering each file
+      // separately meant one approval per file, and it could not preserve
+      // the folder anyway: browsers strip path separators out of download
+      // filenames, so everything landed flat. One archive fixes both.
+      const payloads = asFolder
+        ? [
+            (() => {
+              const entries = entriesFor(files);
+              return {
+                label: folderNameFor(files),
+                size: zipSize(entries),
+                note: `${files.length} ${files.length === 1 ? "file" : "files"}`,
+                open: () => zipStream(entries),
+              };
+            })(),
+          ]
+        : files.map((file) => ({
+            label: file.name,
+            size: file.size,
+            note: "",
+            open: () => file.stream() as ReadableStream<Uint8Array>,
+          }));
+
+      // One group per payload, spanning its recipients.
+      const groups = payloads.map(() => toHex(randomBytes(6)));
 
       for (const to of targets) {
-        for (const file of files) {
+        for (const [index, payload] of payloads.entries()) {
           const requestId = toHex(randomBytes(8));
           const streamId = randomBytes(16);
-          // webkitRelativePath survives a folder pick, so the receiver
-          // sees "photos/2024/a.jpg" rather than a pile of bare names.
-          const label =
-            asFolder && file.webkitRelativePath
-              ? file.webkitRelativePath
-              : file.name;
 
           outgoingRef.current.set(requestId, {
             requestId,
             peerId: to,
             peerName: peerName(to),
-            file,
-            label,
+            size: payload.size,
+            openStream: payload.open,
+            label: payload.label,
             streamId,
             state: "offered",
             sentBytes: 0,
             at: Date.now(),
-            groupId: groups.get(file) ?? requestId,
+            groupId: groups[index],
           });
           syncOutgoing();
 
@@ -497,10 +526,12 @@ export function useSession(name: string, active: boolean) {
               from: name,
               from_ip: "",
               to: peerName(to),
-              name: label,
-              size: file.size,
+              name: payload.label,
+              size: payload.size,
               ts: Math.floor(Date.now() / 1000),
-              message: "",
+              // Carries the folder's file count so the receiver can judge
+              // the offer before approving it.
+              message: payload.note,
               // Per-chunk AEAD authenticates every byte in flight, so a
               // whole-file digest would only cost a full read of a
               // possibly enormous file before anything could start.

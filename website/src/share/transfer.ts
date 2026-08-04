@@ -29,10 +29,39 @@ export interface UploadOptions {
   relayBase: string;
   transferId: string;
   token: string;
-  file: File;
+  /** Plaintext to seal and send. A File yields one via `file.stream()`. */
+  source: ReadableStream<Uint8Array>;
+  /** Total plaintext bytes. Must match what `source` produces exactly. */
+  totalBytes: number;
   streamKey: CryptoKey;
   onProgress?: (plaintextBytesSent: number) => void;
   signal?: AbortSignal;
+}
+
+/**
+ * Pulls exactly `want` bytes out of a queue of arrivals, leaving the
+ * remainder. Network and zip reads arrive at arbitrary boundaries, but
+ * the AEAD framing needs precise 64 KiB plaintext chunks, and repeatedly
+ * concatenating the whole buffer to slice off the front would be
+ * quadratic on a large transfer.
+ */
+function takeExact(queue: Uint8Array[], want: number): Uint8Array {
+  const out = new Uint8Array(want);
+  let filled = 0;
+  while (filled < want) {
+    const head = queue[0];
+    const need = want - filled;
+    if (head.length <= need) {
+      out.set(head, filled);
+      filled += head.length;
+      queue.shift();
+    } else {
+      out.set(head.subarray(0, need), filled);
+      queue[0] = head.subarray(need);
+      filled = want;
+    }
+  }
+  return out;
 }
 
 /**
@@ -44,48 +73,74 @@ export interface UploadOptions {
  * relay-side support and is deliberately left for later rather than
  * faked here.
  */
-export async function uploadFile(options: UploadOptions): Promise<void> {
-  const { relayBase, transferId, token, file, streamKey, onProgress, signal } =
+export async function uploadStream(options: UploadOptions): Promise<void> {
+  const { relayBase, transferId, token, source, streamKey, onProgress, signal } =
     options;
 
   const writer = new ChunkedFrameWriter(streamKey);
   let sequence = 0;
   let plaintextSent = 0;
-  let buffered: Uint8Array[] = [];
-  let bufferedBytes = 0;
+  let framedQueue: Uint8Array[] = [];
+  let framedBytes = 0;
 
   const flush = async (): Promise<void> => {
-    if (bufferedBytes === 0) return;
-    const body = concatBytes(...buffered);
-    buffered = [];
-    bufferedBytes = 0;
+    if (framedBytes === 0) return;
+    const body = concatBytes(...framedQueue);
+    framedQueue = [];
+    framedBytes = 0;
     await postChunk(relayBase, transferId, token, sequence, body, signal);
     sequence += 1;
   };
 
-  for (
-    let offset = 0;
-    offset < file.size;
-    offset += STREAM_CHUNK_PLAIN_BYTES
-  ) {
-    signal?.throwIfAborted();
-    const slice = file.slice(offset, offset + STREAM_CHUNK_PLAIN_BYTES);
-    const plaintext = new Uint8Array(await slice.arrayBuffer());
+  const seal = async (plaintext: Uint8Array): Promise<void> => {
     const framed = await writer.seal(plaintext);
-
-    buffered.push(framed);
-    bufferedBytes += framed.length;
+    framedQueue.push(framed);
+    framedBytes += framed.length;
     plaintextSent += plaintext.length;
-
-    if (bufferedBytes >= UPLOAD_CHUNK_TARGET_BYTES) {
+    if (framedBytes >= UPLOAD_CHUNK_TARGET_BYTES) {
       await flush();
       onProgress?.(plaintextSent);
     }
+  };
+
+  const pending: Uint8Array[] = [];
+  let pendingBytes = 0;
+  const reader = source.getReader();
+
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.length === 0) continue;
+      pending.push(value);
+      pendingBytes += value.length;
+      while (pendingBytes >= STREAM_CHUNK_PLAIN_BYTES) {
+        await seal(takeExact(pending, STREAM_CHUNK_PLAIN_BYTES));
+        pendingBytes -= STREAM_CHUNK_PLAIN_BYTES;
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
+
+  if (pendingBytes > 0) await seal(takeExact(pending, pendingBytes));
 
   await flush();
   onProgress?.(plaintextSent);
   await postEnd(relayBase, transferId, token, signal);
+}
+
+/** Convenience for the single-file case. */
+export function uploadFile(
+  options: Omit<UploadOptions, "source" | "totalBytes"> & { file: File },
+): Promise<void> {
+  const { file, ...rest } = options;
+  return uploadStream({
+    ...rest,
+    source: file.stream() as ReadableStream<Uint8Array>,
+    totalBytes: file.size,
+  });
 }
 
 async function postChunk(

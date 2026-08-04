@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Search } from "lucide-react";
 
 import { EVERYONE } from "./useSession";
 import type { Peer } from "./relay";
@@ -35,10 +36,47 @@ export function ConversationList(props: ConversationListProps) {
   } = props;
 
   const [joinValue, setJoinValue] = useState("");
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // A search field is clutter until there are enough people to lose
+  // somebody among.
+  const searchable = peers.length > 5;
+
+  const shown = useMemo(() => {
+    if (!searchable || !query.trim()) return peers;
+    const needle = query.trim().toLowerCase();
+    return peers.filter((peer) =>
+      (labels[peer.id] ?? peer.name).toLowerCase().includes(needle),
+    );
+  }, [peers, labels, query, searchable]);
 
   return (
-    <nav className="rail" aria-label="Conversations">
+    <nav
+      className="rail"
+      aria-label="Conversations"
+      onKeyDown={(event) => {
+        if (event.key === "/" && event.target === event.currentTarget) {
+          event.preventDefault();
+          searchRef.current?.focus();
+        }
+      }}
+    >
       <p className="rail-label">Conversations</p>
+
+      {searchable ? (
+        <div className="rail-search">
+          <Search size={14} strokeWidth={2.2} aria-hidden="true" />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Find someone"
+            aria-label="Find someone"
+            type="search"
+          />
+        </div>
+      ) : null}
 
       <ul className="rail-list">
         <li>
@@ -53,7 +91,7 @@ export function ConversationList(props: ConversationListProps) {
           </button>
         </li>
 
-        {peers.map((peer) => (
+        {shown.map((peer) => (
           <li key={peer.id}>
             <button
               type="button"
@@ -93,6 +131,10 @@ export function ConversationList(props: ConversationListProps) {
           </button>
         </li>
       </ul>
+
+      {searchable && shown.length === 0 ? (
+        <p className="rail-note">Nobody here matches that.</p>
+      ) : null}
 
       {peers.length === 0 ? (
         <p className="rail-note">

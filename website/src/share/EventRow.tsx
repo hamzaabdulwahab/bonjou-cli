@@ -46,7 +46,8 @@ export function IncomingRow({
         {pending ? (
           <>
             <p className="card-note">
-              Nothing has been downloaded yet. Approving starts the transfer.
+              {item.note ? `${item.note}. ` : ""}Nothing has been downloaded
+              yet. Approving starts the transfer.
             </p>
             <div className="card-actions">
               <button type="button" onClick={() => onApprove(item)}>
@@ -82,7 +83,7 @@ export function OutgoingRow({
   const failed = items.filter((i) => i.state === "failed" || i.state === "declined");
   const sending = items.filter((i) => i.state === "sending");
 
-  const totalBytes = items.reduce((sum, i) => sum + i.file.size, 0);
+  const totalBytes = items.reduce((sum, i) => sum + i.size, 0);
   const sentBytes = items.reduce((sum, i) => sum + i.sentBytes, 0);
   const fraction = totalBytes > 0 ? sentBytes / totalBytes : 0;
 
@@ -100,7 +101,7 @@ export function OutgoingRow({
       <div className="card">
         <div className="card-head">
           <span className="card-name">{first.label}</span>
-          <span className="card-size">{formatBytes(first.file.size)}</span>
+          <span className="card-size">{formatBytes(first.size)}</span>
         </div>
         <span className={`status is-${summaryState(items)}`}>
           {outgoingLabel(items, done, sending.length, fraction)}

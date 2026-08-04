@@ -42,14 +42,15 @@ const (
 	wizardMinWidth  = 1
 	wizardMinHeight = 8
 
-	// Side margin reserved when scaling the wizard to the terminal width.
-	// Two columns on each side gives the rounded border breathing room from
-	// the screen edge without leaving big empty bands of background.
+	// Side margin reserved when scaling the wizard to the terminal width,
+	// so content does not sit flush against the screen edge. Nothing to do
+	// with a frame; the wizard has no border.
 	wizardSideMargin = 4
 
 	// Minimum render widths. Below these the form's content doesn't lay out
-	// cleanly. There is no fixed maximum — the wizard expands to fill the
-	// terminal so the pink border spans the visible width on wide screens.
+	// cleanly. There is no fixed maximum: the wizard expands to fill the
+	// terminal, and wizardRenderWidthFor clamps it back if the terminal is
+	// narrower than the minimum.
 	wizardMenuMinWidth    = 36
 	wizardMessageMinWidth = 40
 
@@ -158,7 +159,7 @@ func (h *Handler) cmdWizard() (Result, error) {
 			return Result{Output: "Wizard closed. Returned to command prompt."}, nil
 		}
 		if errors.Is(err, errWizardBack) {
-			status = wizardStatusInfo("Back to wizard menu.")
+			status = wizardStatusNotice("Back to wizard menu.")
 			continue
 		}
 		if err != nil {
@@ -202,7 +203,7 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 	peer, err := h.wizardSelectPeer("Choose recipient")
 	if err != nil {
 		if errors.Is(err, errWizardNoPeers) {
-			return wizardStatusError("No active users discovered. Use @users to refresh discovery and try again."), nil
+			return wizardStatusNotice(noPeersNotice), nil
 		}
 		if errors.Is(err, errWizardBack) {
 			return "", errWizardBack
@@ -236,7 +237,7 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 			return "", err
 		}
 		if !confirmed {
-			return wizardStatusInfo("Cancelled. Nothing was sent."), nil
+			return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 		}
 		if err := h.session.Transfer.SendMessage(peer, message); err != nil {
 			return wizardStatusError(fmt.Sprintf("Failed to send message to %s: %v", peerLabel(peer), err)), nil
@@ -261,7 +262,7 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 			return "", err
 		}
 		if !confirmed {
-			return wizardStatusInfo("Cancelled. Nothing was sent."), nil
+			return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 		}
 		if err := h.session.Transfer.SendFile(peer, path); err != nil {
 			return "", nil
@@ -286,7 +287,7 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 			return "", err
 		}
 		if !confirmed {
-			return wizardStatusInfo("Cancelled. Nothing was sent."), nil
+			return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 		}
 		if err := h.session.Transfer.SendFolder(peer, path); err != nil {
 			return "", nil
@@ -302,10 +303,10 @@ func (h *Handler) wizardSendMulti() (string, error) {
 		peers, err := h.wizardSelectPeers("Choose recipients")
 		if err != nil {
 			if errors.Is(err, errWizardNoPeers) {
-				return wizardStatusError("No active users discovered. Use @users to refresh discovery and try again."), nil
+				return wizardStatusNotice(noPeersNotice), nil
 			}
 			if errors.Is(err, errWizardNoSelection) {
-				return wizardStatusError("No recipients selected."), nil
+				return wizardStatusNotice("Nobody selected. Nothing was sent."), nil
 			}
 			if errors.Is(err, errWizardBack) {
 				return "", errWizardBack
@@ -376,7 +377,7 @@ func (h *Handler) wizardSendMulti() (string, error) {
 				return "", err
 			}
 			if !confirmed {
-				return wizardStatusInfo("Cancelled. Nothing was sent."), nil
+				return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 			}
 
 			success, errs := h.sendToPeers(peers, transferKind, message, path)
@@ -408,7 +409,7 @@ func (h *Handler) wizardSendBroadcast() (string, error) {
 		return "", err
 	}
 	if !confirmed {
-		return wizardStatusInfo("Cancelled. Nothing was sent."), nil
+		return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 	}
 
 	result, err := h.cmdBroadcast(message)
@@ -416,15 +417,15 @@ func (h *Handler) wizardSendBroadcast() (string, error) {
 		return wizardStatusError(fmt.Sprintf("Broadcast failed: %v", err)), nil
 	}
 	if strings.TrimSpace(result.Output) == "" {
-		return wizardStatusInfo("Broadcast sent."), nil
+		return wizardStatusNotice("Broadcast sent."), nil
 	}
 	if strings.EqualFold(strings.TrimSpace(result.Output), "No peers to broadcast to.") {
-		return wizardStatusError("No active users discovered. Use @users to refresh discovery and try again."), nil
+		return wizardStatusNotice(noPeersNotice), nil
 	}
 	if strings.HasPrefix(strings.TrimSpace(result.Output), "Broadcast completed with errors:") {
 		return wizardStatusError(result.Output), nil
 	}
-	return wizardStatusInfo(result.Output), nil
+	return wizardStatusNotice(result.Output), nil
 }
 
 func (h *Handler) wizardSelectPeer(title string) (*network.Peer, error) {
@@ -784,6 +785,14 @@ func wizardRenderWidthFor(cols, minW int) int {
 	if width < minW {
 		width = minW
 	}
+	// Never wider than the terminal itself. The minimum above could push
+	// the form past a narrow screen — at 30 columns it asked for 36 — and
+	// every line then wrapped into fragments that read as broken framing.
+	// Zooming in reduces the column count, which is exactly when this
+	// showed up.
+	if cols > 0 && width > cols {
+		width = cols
+	}
 	return width
 }
 
@@ -824,15 +833,7 @@ func wizardTheme() *huh.Theme {
 	// so the layout reflows cleanly at any zoom level. Pink stays — we
 	// just apply it to the typography (title, selectors, cursor) instead
 	// of to a frame.
-	t.Focused.Base = t.Focused.Base.
-		UnsetBorderStyle().
-		UnsetBorderForeground().
-		BorderTop(false).
-		BorderRight(false).
-		BorderBottom(false).
-		BorderLeft(false).
-		Padding(0, 0).
-		Margin(0)
+	t.Focused.Base = stripFrame(t.Focused.Base).Padding(0, 0).Margin(0)
 	t.Focused.Card = t.Focused.Base
 	t.Focused.Title = t.Focused.Title.Foreground(pink).Bold(true)
 	t.Focused.NoteTitle = t.Focused.NoteTitle.Foreground(pink).Bold(true)
@@ -851,32 +852,51 @@ func wizardTheme() *huh.Theme {
 	// border. Without this, unfocused fields would inherit huh's default
 	// hidden-border style and still leak phantom column widths.
 	t.Blurred = t.Focused
-	t.Blurred.Base = t.Blurred.Base.
-		UnsetBorderStyle().
-		UnsetBorderForeground().
-		BorderTop(false).
-		BorderRight(false).
-		BorderBottom(false).
-		BorderLeft(false).
-		Padding(0, 0).
-		Margin(0)
+	t.Blurred.Base = stripFrame(t.Blurred.Base).Padding(0, 0).Margin(0)
 	t.Blurred.Card = t.Blurred.Base
 	t.Blurred.NextIndicator = lipgloss.NewStyle()
 	t.Blurred.PrevIndicator = lipgloss.NewStyle()
 
+	// Form and Group carry their own Base styles that the loop above never
+	// touched. They inherit no border from ThemeCharm today, but a huh
+	// upgrade could add one, and a stray frame here is invisible until a
+	// terminal resize smears it across the alt screen.
+	t.Form.Base = stripFrame(t.Form.Base)
+	t.Group.Base = stripFrame(t.Group.Base)
 	t.Group.Title = t.Focused.Title
 	t.Group.Description = t.Focused.Description
 	return t
 }
 
-func wizardStatusInfo(message string) string {
-	trimmed := strings.TrimSpace(message)
-	if trimmed == "" {
-		return ""
-	}
-	return "Info: " + trimmed
+// stripFrame removes every border edge from a style. lipgloss draws boxes
+// by measuring content width and stamping characters around it; when a
+// resize lands mid-render the cached and current widths disagree and the
+// leftovers stay on screen.
+func stripFrame(style lipgloss.Style) lipgloss.Style {
+	return style.
+		UnsetBorderStyle().
+		UnsetBorderForeground().
+		BorderTop(false).
+		BorderRight(false).
+		BorderBottom(false).
+		BorderLeft(false)
 }
 
+// wizardStatusNotice reports a state: nobody has appeared yet, an action
+// was cancelled, the user stepped back. These carry no prefix. Labelling
+// them makes an ordinary situation look like something went wrong, and
+// once everything is labelled the label stops meaning anything.
+// noPeersNotice is shared by every wizard flow that needs somebody to
+// send to. Discovery is same-subnet only, which is the part users
+// actually need to know.
+const noPeersNotice = "Nobody has appeared yet. Bonjou needs to be running on another device on the same network."
+
+func wizardStatusNotice(message string) string {
+	return strings.TrimSpace(message)
+}
+
+// wizardStatusError is for genuine failures, where the prefix earns its
+// place by distinguishing them from the above.
 func wizardStatusError(message string) string {
 	trimmed := strings.TrimSpace(message)
 	if trimmed == "" {

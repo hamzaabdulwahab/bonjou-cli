@@ -5,9 +5,9 @@
    a physical object on the page, not a screenshot of one, so the page
    is bright and the tool is not.
 
-   Type: Satoshi carries display and body. Geometric and warm rather than
-   newsy, which is the register modern product interfaces sit in, with
-   hierarchy from weight and size alone and no synthetic width stretching.
+   Type: Manrope carries display and body. Soft, semi-rounded, generous
+   x-height, the register Stripe and Notion sit in, with hierarchy from
+   weight and size alone and no synthetic width stretching.
    JetBrains Mono is reserved for things that are literally data: codes,
    byte counts, shell commands. Labels are small-caps sans, because a wide
    mono set in caps at 10px is hard to read and looks like a readout for
@@ -40,8 +40,8 @@
   --wire: oklch(88% 0.012 250);
   --good: oklch(62% 0.15 155);
 
-  --display: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --body: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --display: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --body: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --gutter: clamp(1.25rem, 4vw, 4rem);
@@ -91,8 +91,8 @@ h1,
 h2,
 h3 {
   font-family: var(--display);
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
   line-height: 1.02;
   margin: 0;
   text-wrap: balance;
@@ -181,7 +181,7 @@ a:hover {
 
 .wordmark {
   font-family: var(--display);
-  font-weight: 900;
+  font-weight: 800;
   font-size: 1.2rem;
   letter-spacing: -0.035em;
   text-decoration: none;
@@ -367,18 +367,35 @@ textarea::placeholder {
   color: var(--panel-dim);
 }
 
+.instrument {
+  height: min(74vh, 40rem);
+}
+
 .instrument-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1px;
   background: var(--panel-line);
-  min-height: 24rem;
+  flex: 1;
+  min-height: 0;
 }
 
 @media (min-width: 62rem) {
   .instrument-body {
     grid-template-columns: 17rem minmax(0, 1fr);
-    min-height: 27rem;
+  }
+}
+
+/* Narrow screens stack the rail above the thread, so a viewport-relative
+   height would squeeze the conversation to nothing. */
+@media (max-width: 61.99rem) {
+  .instrument {
+    height: auto;
+    max-height: none;
+  }
+
+  .thread-body {
+    max-height: 26rem;
   }
 }
 
@@ -549,12 +566,98 @@ textarea::placeholder {
   color: var(--panel-dim);
 }
 
+/* Positioning context for the jump button, which floats over the scroll
+   area rather than inside it. */
+.thread-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 .thread-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 1rem 1.15rem;
+}
+
+.jump {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 999px;
+  background: var(--panel-3);
+  border: 1px solid var(--panel-line);
+  color: var(--panel-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  box-shadow: 0 6px 16px -8px oklch(12% 0.02 262 / 0.8);
+  animation: jump-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.jump:hover:not(:disabled) {
+  background: var(--panel-3);
+  border-color: var(--panel-dim);
+}
+
+.jump.has-missed {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: oklch(98% 0.01 40);
+}
+
+.jump.has-missed:hover:not(:disabled) {
+  background: var(--signal-bright);
+  border-color: var(--signal-bright);
+}
+
+@keyframes jump-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rail-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  color: var(--panel-dim);
+}
+
+.rail-search:focus-within {
+  border-color: var(--signal);
+}
+
+.rail-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--panel-text);
+  font-size: 0.85rem;
+}
+
+.rail-search input:focus-visible {
+  outline: none;
+}
+
+.rail-search input::-webkit-search-cancel-button {
+  filter: invert(0.6);
 }
 
 .empty {
