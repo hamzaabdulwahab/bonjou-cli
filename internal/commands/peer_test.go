@@ -16,8 +16,8 @@ func TestSanitiseUsernameStripsControlAndZeroWidth(t *testing.T) {
 		// translated or removed.
 		{"leading-trailing-space", "  bob  ", "bob", false},
 		{"control-chars", "ali\x00ce\x07", "alice", true},
-		{"zero-width-joiner", "ali​ce", "alice", true},
-		{"bidi-override", "ali‮ce", "alice", true},
+		{"zero-width-joiner", "ali\u200bce", "alice", true},
+		{"bidi-override", "ali\u202ece", "alice", true},
 	}
 	for _, c := range cases {
 		got, changed := sanitiseUsername(c.input)
@@ -31,7 +31,7 @@ func TestSanitiseUsernameStripsControlAndZeroWidth(t *testing.T) {
 }
 
 func TestSanitiseUsernameRejectsEmptyAfterStripping(t *testing.T) {
-	got, _ := sanitiseUsername("\x00\x00​")
+	got, _ := sanitiseUsername("\x00\x00\u200b")
 	if got != "" {
 		t.Fatalf("all-unsafe input should produce empty username, got %q", got)
 	}

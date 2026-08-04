@@ -10,12 +10,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        // Only the share app is built. index.html is the in-progress
-        // marketing page and is deliberately left out: nothing currently
-        // links to it, and excluding it means a half-finished edit there
-        // cannot break a deploy. Re-add `main: entry("index.html")` to
-        // ship it again — vercel.json's "/" rewrite defers to a real
-        // static file at the root whenever one exists.
+        // One entry. The site is the share app; vercel.json rewrites "/"
+        // to it. An earlier standalone marketing page and its React entry
+        // lived alongside this and were removed once nothing linked to
+        // them; they are in git history if ever wanted back.
         share: entry("share.html"),
       },
     },

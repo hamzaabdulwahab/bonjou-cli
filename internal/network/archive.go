@@ -29,7 +29,11 @@ func folderPreview(root string, cancel <-chan struct{}) (string, error) {
 	var items []item
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			// Skip what cannot be read rather than abandoning the whole
+			// folder for one unreadable entry. Note this means the
+			// archive can be quietly incomplete; reporting skipped paths
+			// to the sender would be an improvement.
+			return nil //nolint:nilerr // one bad entry must not fail the folder
 		}
 		select {
 		case <-cancel:
@@ -41,7 +45,9 @@ func folderPreview(root string, cancel <-chan struct{}) (string, error) {
 		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
-			return nil
+			// Same reasoning: a path that cannot be made relative to the
+			// root does not belong in the archive anyway.
+			return nil //nolint:nilerr // unrepresentable path is skipped
 		}
 		items = append(items, item{path: filepath.ToSlash(rel), isDir: d.IsDir()})
 		return nil
@@ -187,7 +193,7 @@ func unzip(src, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for _, file := range r.File {
 		targetPath := filepath.Join(dest, filepath.FromSlash(file.Name))

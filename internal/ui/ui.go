@@ -41,14 +41,6 @@ var (
 
 var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 
-var welcomeBanner = []string{
-	` ____   ___  _   _       _  ___  _   _ `,
-	`| __ ) / _ \| \ | |     | |/ _ \| | | |`,
-	`|  _ \| | | |  \| |  _  | | | | | | | |`,
-	`| |_) | |_| | |\  | | |_| | |_| | |_| |`,
-	`|____/ \___/|_| \_|  \___/ \___/ \___/ `,
-}
-
 // welcomeBannerV2 renders BONJOU in the larry3d figlet font.
 // The original welcomeBanner is preserved above for comparison.
 var welcomeBannerV2 = []string{
@@ -106,7 +98,7 @@ func New(session *session.Session, handler *commands.Handler) (*UI, error) {
 		return nil, err
 	}
 	if interactive {
-		fmt.Fprint(os.Stdout, enableBracketedPaste)
+		_, _ = fmt.Fprint(os.Stdout, enableBracketedPaste)
 	} else {
 		fmt.Fprintln(os.Stderr, colorMuted+"(Limited terminal detected; line editing shortcuts may be unavailable.)"+colorReset)
 	}
@@ -139,9 +131,9 @@ func configureReadline(cfg *readline.Config) {
 
 // Run starts the interactive Bonjou session.
 func (u *UI) Run() {
-	defer u.rl.Close()
+	defer func() { _ = u.rl.Close() }()
 	if u.interactive {
-		defer fmt.Fprint(os.Stdout, disableBracketedPaste)
+		defer func() { _, _ = fmt.Fprint(os.Stdout, disableBracketedPaste) }()
 	}
 	u.printWelcome()
 	go u.consumeEvents()
@@ -150,7 +142,7 @@ func (u *UI) Run() {
 		// disables it on exit, so without this the next paste after returning
 		// from the wizard would split on embedded newlines.
 		if u.interactive {
-			fmt.Fprint(os.Stdout, enableBracketedPaste)
+			_, _ = fmt.Fprint(os.Stdout, enableBracketedPaste)
 		}
 		line, err := u.rl.Readline()
 		if err == readline.ErrInterrupt {
@@ -274,7 +266,7 @@ func (u *UI) clearScreen(printWelcome bool) {
 		fmt.Print("\033[2J\033[H")
 	} else {
 		u.printMu.Lock()
-		fmt.Fprint(u.rl.Stdout(), "\033[2J\033[H")
+		_, _ = fmt.Fprint(u.rl.Stdout(), "\033[2J\033[H")
 		u.printMu.Unlock()
 		u.rl.Refresh()
 	}
@@ -362,10 +354,10 @@ func (u *UI) emitLine(line string) {
 
 	u.printMu.Lock()
 	stderr := u.rl.Stderr()
-	fmt.Fprint(stderr, "\r\033[K")
-	fmt.Fprintf(stderr, "%s\n", line)
+	_, _ = fmt.Fprint(stderr, "\r\033[K")
+	_, _ = fmt.Fprintf(stderr, "%s\n", line)
 	if active {
-		fmt.Fprintf(stderr, "%s", progressLine)
+		_, _ = fmt.Fprintf(stderr, "%s", progressLine)
 	}
 	u.printMu.Unlock()
 }
@@ -410,7 +402,7 @@ func (u *UI) updateProgressLine(id, line string) {
 	}
 
 	u.printMu.Lock()
-	fmt.Fprintf(u.rl.Stderr(), "\r\033[J%s", line)
+	_, _ = fmt.Fprintf(u.rl.Stderr(), "\r\033[J%s", line)
 	u.printMu.Unlock()
 }
 
@@ -436,7 +428,7 @@ func (u *UI) finishProgressLine(id, line string) {
 		fmt.Printf("\r\033[J%s\n", line)
 	} else {
 		u.printMu.Lock()
-		fmt.Fprintf(u.rl.Stderr(), "\r\033[J%s\n", line)
+		_, _ = fmt.Fprintf(u.rl.Stderr(), "\r\033[J%s\n", line)
 		u.printMu.Unlock()
 	}
 
@@ -520,20 +512,6 @@ func (u *UI) formatProgressLine(ps *events.ProgressState, percent float64, done 
 		summary += " " + peer
 	}
 	return composeProgressLine(summary, metrics, percent, barWidth, maxWidth)
-}
-
-func (u *UI) colorizePath(path string) string {
-	clean := path
-	if u.homeDir != "" && strings.HasPrefix(path, u.homeDir) {
-		suffix := strings.TrimPrefix(path, u.homeDir)
-		suffix = strings.TrimPrefix(suffix, string(os.PathSeparator))
-		if suffix == "" {
-			clean = "~"
-		} else {
-			clean = "~" + string(os.PathSeparator) + suffix
-		}
-	}
-	return colorPrimary + clean + colorReset
 }
 
 func (u *UI) progressTarget(ps *events.ProgressState, limit int) string {

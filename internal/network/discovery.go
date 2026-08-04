@@ -146,7 +146,7 @@ func (d *DiscoveryService) ForceAnnounce() {
 		d.logger.Error("force announce socket: %v", err)
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	enableBroadcast(conn)
 	_ = conn.SetWriteBuffer(1024)
 	addrs := d.broadcastAddrs()
@@ -268,7 +268,7 @@ func (d *DiscoveryService) listenLoop() {
 		}
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	buf := make([]byte, 1024)
 	for {
 		if d.isStopping() {
@@ -365,7 +365,7 @@ func (d *DiscoveryService) announceLoop() {
 		d.logger.Error("discovery announcer failed: %v", err)
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	enableBroadcast(conn)
 	if err := conn.SetWriteBuffer(1024); err != nil {
 		d.logger.Error("discovery write buffer: %v", err)

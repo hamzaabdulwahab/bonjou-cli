@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -135,7 +136,7 @@ func (h *Handler) cmdWizard() (Result, error) {
 				),
 			),
 		); err != nil {
-			return Result{Output: "Wizard closed. Returned to command prompt."}, nil
+			return asOutput("Wizard closed. Returned to command prompt.")
 		}
 
 		var actionStatus string
@@ -156,7 +157,7 @@ func (h *Handler) cmdWizard() (Result, error) {
 		}
 
 		if errors.Is(err, errWizardExit) {
-			return Result{Output: "Wizard closed. Returned to command prompt."}, nil
+			return asOutput("Wizard closed. Returned to command prompt.")
 		}
 		if errors.Is(err, errWizardBack) {
 			status = wizardStatusNotice("Back to wizard menu.")
@@ -265,8 +266,10 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 			return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 		}
 		if err := h.session.Transfer.SendFile(peer, path); err != nil {
-			return "", nil
+			return wizardStatusError(fmt.Sprintf("Could not send %s: %v", filepath.Base(path), err)), nil
 		}
+		// Success is deliberately quiet: the transfer emits its own
+		// progress and delivery events.
 		return "", nil
 	case "folder":
 		path, err := wizardPathInput("Folder path", "~/Downloads/my-folder", true)
@@ -290,7 +293,7 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 			return wizardStatusNotice("Cancelled. Nothing was sent."), nil
 		}
 		if err := h.session.Transfer.SendFolder(peer, path); err != nil {
-			return "", nil
+			return wizardStatusError(fmt.Sprintf("Could not send %s: %v", filepath.Base(path), err)), nil
 		}
 		return "", nil
 	default:

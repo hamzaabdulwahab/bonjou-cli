@@ -40,6 +40,17 @@ func New(session *session.Session) *Handler {
 	return &Handler{session: session}
 }
 
+// asOutput reports a condition to the user through the normal output
+// stream rather than as a command failure.
+//
+// The console renders a returned error in its error style; these are
+// situations the user can correct, such as a bad queue id or a path that
+// does not exist, and they read better as ordinary output carrying the
+// usage hint. The nil error is the point, not an oversight.
+func asOutput(message string) (Result, error) {
+	return Result{Output: message}, nil
+}
+
 // Handle parses command input and executes the matching action.
 func (h *Handler) Handle(input string) (Result, error) {
 	trimmed := sanitizeCommandInput(input)

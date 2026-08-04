@@ -44,9 +44,8 @@ const (
 )
 
 var (
-	errServiceStopping  = errors.New("transfer service stopping")
-	errApprovalMissing  = errors.New("transfer approval request not found")
-	errTransferRejected = errors.New("transfer was rejected by receiver")
+	errServiceStopping = errors.New("transfer service stopping")
+	errApprovalMissing = errors.New("transfer approval request not found")
 )
 
 type envelope struct {
@@ -222,7 +221,7 @@ func (t *TransferService) acceptLoop() {
 		t.wait.Add(1)
 		go func(c net.Conn) {
 			defer t.wait.Done()
-			defer c.Close()
+			defer func() { _ = c.Close() }()
 			if err := t.handleConnection(c); err != nil {
 				if errors.Is(err, errServiceStopping) {
 					return
@@ -726,7 +725,7 @@ func (t *TransferService) performApprovedFileTransfer(env *envelope, approval *o
 	if err != nil {
 		return fmt.Errorf("cannot read file for transfer: %v", err)
 	}
-	defer tf.file.Close()
+	defer func() { _ = tf.file.Close() }()
 
 	localUser, localIP := t.identity()
 	sendEnv := &envelope{
@@ -802,13 +801,13 @@ func (t *TransferService) performApprovedFolderTransfer(env *envelope, approval 
 			return fmt.Errorf("failed to compress folder for transfer: %v", err)
 		}
 	}
-	defer os.Remove(archivePath)
+	defer func() { _ = os.Remove(archivePath) }()
 
 	tf, err := openTransferFile(archivePath)
 	if err != nil {
 		return fmt.Errorf("cannot read compressed archive for transfer: %v", err)
 	}
-	defer tf.file.Close()
+	defer func() { _ = tf.file.Close() }()
 
 	localUser, localIP := t.identity()
 	sendEnv := &envelope{
@@ -902,7 +901,7 @@ func (t *TransferService) sendEnvelope(peer *Peer, env *envelope, writer func(io
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	sealed, err := sealEnvelope(env, shared)
 	if err != nil {
@@ -941,7 +940,7 @@ func (t *TransferService) sendEnvelope(peer *Peer, env *envelope, writer func(io
 					if strings.EqualFold(ack.AckStatus, "ok") {
 						return nil
 					}
-					return fmt.Errorf("Delivery failed: %s '%s' to %s", transferKindLabel(env.Kind), transferDisplayName(env.Kind, env.Name), peerLabelOrIP(peer))
+					return fmt.Errorf("delivery failed: %s '%s' to %s", transferKindLabel(env.Kind), transferDisplayName(env.Kind, env.Name), peerLabelOrIP(peer))
 				}
 			}
 			return err
@@ -1235,7 +1234,7 @@ func (t *TransferService) copyWithProgress(writer io.Writer, reader io.Reader, t
 	if deadline > 0 {
 		if s, ok := writer.(writeDeadlineSetter); ok {
 			setter = s
-			defer setter.SetWriteDeadline(time.Time{})
+			defer func() { _ = setter.SetWriteDeadline(time.Time{}) }()
 		}
 	}
 	for {
@@ -1308,7 +1307,7 @@ func (t *TransferService) readWithProgress(reader io.Reader, writer io.Writer, t
 	if deadline > 0 {
 		if s, ok := reader.(readDeadlineSetter); ok {
 			setter = s
-			defer setter.SetReadDeadline(time.Time{})
+			defer func() { _ = setter.SetReadDeadline(time.Time{}) }()
 		}
 	}
 	for received < total {
@@ -1404,7 +1403,7 @@ func (t *TransferService) awaitInlineDeliveryAck(conn net.Conn, shared []byte, s
 	}
 	if setter, ok := conn.(readDeadlineSetter); ok {
 		_ = setter.SetReadDeadline(time.Now().Add(ackTimeout))
-		defer setter.SetReadDeadline(time.Time{})
+		defer func() { _ = setter.SetReadDeadline(time.Time{}) }()
 	}
 	frame, err := readEnvelope(conn)
 	if err != nil {
@@ -1425,7 +1424,7 @@ func (t *TransferService) awaitInlineDeliveryAck(conn net.Conn, shared []byte, s
 	}
 	t.renderDeliveryAck(ack)
 	if !strings.EqualFold(ack.AckStatus, "ok") {
-		return fmt.Errorf("Delivery failed: %s '%s' to %s", transferKindLabel(sent.Kind), transferDisplayName(sent.Kind, sent.Name), strings.TrimSpace(sent.To))
+		return fmt.Errorf("delivery failed: %s '%s' to %s", transferKindLabel(sent.Kind), transferDisplayName(sent.Kind, sent.Name), strings.TrimSpace(sent.To))
 	}
 	return nil
 }

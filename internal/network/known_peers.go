@@ -63,8 +63,10 @@ func (k *KnownPeers) load() error {
 	var entries []*KnownPeer
 	if err := json.Unmarshal(data, &entries); err != nil {
 		// Corrupt store: rename and start fresh rather than fail to boot.
+		// Refusing to start would leave the user with no way back in,
+		// and the old file is preserved for inspection.
 		_ = os.Rename(k.path, k.path+".corrupt")
-		return nil
+		return nil //nolint:nilerr // corrupt store is recovered, not fatal
 	}
 	for _, entry := range entries {
 		if entry == nil {

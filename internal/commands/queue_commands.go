@@ -49,14 +49,14 @@ func (h *Handler) cmdQueue() (Result, error) {
 		if strings.TrimSpace(item.SenderIP) != "" {
 			sender = fmt.Sprintf("%s (%s)", item.Sender, item.SenderIP)
 		}
-		sb.WriteString(fmt.Sprintf("  [%d] %s • %s • from %s • %s • queued %s\n",
+		fmt.Fprintf(&sb, "  [%d] %s • %s • from %s • %s • queued %s\n",
 			item.ID,
 			kindLabel,
 			nameLabel,
 			sender,
 			formatSize(item.Size),
 			queuedLabel(item.Timestamp),
-		))
+		)
 	}
 	sb.WriteString("\nUse @view <ID>, @approve <ID>, @reject <ID>, @approveAll, or @rejectAll")
 	return Result{Output: sb.String()}, nil
@@ -65,7 +65,7 @@ func (h *Handler) cmdQueue() (Result, error) {
 func (h *Handler) cmdApprove(args string) (Result, error) {
 	queueID, err := parseSingleQueueID(args, "Usage: @approve <Queue_ID>")
 	if err != nil {
-		return Result{Output: err.Error()}, nil
+		return asOutput(err.Error())
 	}
 
 	kind, approvedPath, approvedName, actionErr := h.approvePendingByID(queueID)
@@ -86,7 +86,7 @@ func (h *Handler) cmdApprove(args string) (Result, error) {
 func (h *Handler) cmdReject(args string) (Result, error) {
 	queueID, err := parseSingleQueueID(args, "Usage: @reject <Queue_ID>")
 	if err != nil {
-		return Result{Output: err.Error()}, nil
+		return asOutput(err.Error())
 	}
 
 	kind, rejectedName, actionErr := h.rejectPendingByID(queueID)
@@ -156,7 +156,7 @@ func (h *Handler) cmdRejectAll() (Result, error) {
 func (h *Handler) cmdView(args string) (Result, error) {
 	indices, err := parseCommaIndices(args)
 	if err != nil || len(indices) == 0 {
-		return Result{Output: "Usage: @view <Queue_ID>"}, nil
+		return asOutput("Usage: @view <Queue_ID>")
 	}
 	if len(indices) != 1 {
 		return Result{Output: "Metadata-first approvals do not support nested view indices. Use @view <Queue_ID>."}, nil
@@ -192,15 +192,15 @@ func (h *Handler) cmdView(args string) (Result, error) {
 
 	destPath := queue.UniquePath(filepath.Join(h.session.Config.ReceivedFoldersDir, f.Name))
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\033[36mPending Folder [%d] '%s/':\033[0m\n", queueID, f.Name))
-	sb.WriteString(fmt.Sprintf("From: %s", f.Sender))
+	fmt.Fprintf(&sb, "\033[36mPending Folder [%d] '%s/':\033[0m\n", queueID, f.Name)
+	fmt.Fprintf(&sb, "From: %s", f.Sender)
 	if strings.TrimSpace(f.SenderIP) != "" {
-		sb.WriteString(fmt.Sprintf(" (%s)", f.SenderIP))
+		fmt.Fprintf(&sb, " (%s)", f.SenderIP)
 	}
-	sb.WriteString(fmt.Sprintf("\nSize: %s\n", formatSize(f.Size)))
-	sb.WriteString(fmt.Sprintf("Queued: %s\n", queuedLabel(f.Timestamp)))
-	sb.WriteString(fmt.Sprintf("Destination: %s\n", destPath))
-	sb.WriteString(fmt.Sprintf("Next: @approve %d or @reject %d\n", queueID, queueID))
+	fmt.Fprintf(&sb, "\nSize: %s\n", formatSize(f.Size))
+	fmt.Fprintf(&sb, "Queued: %s\n", queuedLabel(f.Timestamp))
+	fmt.Fprintf(&sb, "Destination: %s\n", destPath)
+	fmt.Fprintf(&sb, "Next: @approve %d or @reject %d\n", queueID, queueID)
 	sb.WriteString("Status: not downloaded yet")
 
 	preview := strings.TrimSpace(f.Preview)
@@ -219,16 +219,6 @@ func (h *Handler) cmdView(args string) (Result, error) {
 
 	sb.WriteString("\n\n  (no manifest available)")
 	return Result{Output: sb.String()}, nil
-}
-
-func (h *Handler) approveNestedFile(queueID int, nestedIndices []int) (Result, error) {
-	_, _ = queueID, nestedIndices
-	return Result{Output: "Metadata-first approvals do not support partial folder approval. Use @approve <ID> or @reject <ID>."}, nil
-}
-
-func (h *Handler) rejectNestedFile(queueID int, nestedIndices []int) (Result, error) {
-	_, _ = queueID, nestedIndices
-	return Result{Output: "Metadata-first approvals do not support partial folder rejection. Use @approve <ID> or @reject <ID>."}, nil
 }
 
 func parseCommaIndices(args string) ([]int, error) {
@@ -254,7 +244,7 @@ func parseSingleQueueID(args, usage string) (int, error) {
 		return 0, errors.New(usage)
 	}
 	if len(indices) != 1 {
-		return 0, errors.New("Use exactly one queue ID.")
+		return 0, errors.New("use exactly one queue ID")
 	}
 	return indices[0], nil
 }
@@ -341,12 +331,6 @@ func (h *Handler) pendingSummaries() []pendingSummary {
 		return items[i].ID < items[j].ID
 	})
 	return items
-}
-
-func (h *Handler) pendingCounts() (int, int, int) {
-	files := len(h.session.Queue.ListFiles())
-	folders := len(h.session.Queue.ListFolders())
-	return files + folders, files, folders
 }
 
 func queuedLabel(ts time.Time) string {

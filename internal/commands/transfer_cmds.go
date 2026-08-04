@@ -212,28 +212,6 @@ func (h *Handler) cmdMulti(parts []string, args string) (Result, error) {
 	return Result{Output: fmt.Sprintf("Completed %d transfers", success)}, nil
 }
 
-// extractFailedTargets is no longer used in production (cmdMulti tracks
-// failures structurally now) but is kept so older test helpers and
-// downstream callers can compile. New code should not depend on it.
-func extractFailedTargets(errs []string, allTargets []string) []string {
-	failedSet := make(map[string]bool)
-	for _, errMsg := range errs {
-		parts := strings.SplitN(errMsg, ":", 2)
-		if len(parts) > 0 {
-			target := strings.TrimSpace(parts[0])
-			target = strings.TrimSuffix(target, " (sequential retry)")
-			failedSet[target] = true
-		}
-	}
-	var failed []string
-	for _, target := range allTargets {
-		if failedSet[target] {
-			failed = append(failed, target)
-		}
-	}
-	return failed
-}
-
 func (h *Handler) cmdBroadcast(message string) (Result, error) {
 	message = strings.TrimSpace(message)
 	if message == "" {

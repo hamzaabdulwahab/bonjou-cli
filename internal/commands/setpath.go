@@ -30,7 +30,7 @@ func (h *Handler) cmdSetPath(arg string) (Result, error) {
 		return Result{}, err
 	}
 	if err := validateReceivePath(dir, force); err != nil {
-		return Result{Output: err.Error()}, nil
+		return asOutput(err.Error())
 	}
 	cfg := h.session.Config
 	cfg.SaveDir = dir
@@ -64,7 +64,11 @@ func validateReceivePath(dir string, force bool) error {
 	}
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {
-		return nil
+		// The remaining checks only warn about paths outside the home
+		// directory. With no home to compare against there is nothing to
+		// warn about, and refusing the path would be worse than allowing
+		// it: this is advice, not a gate.
+		return nil //nolint:nilerr // advisory check, skipped when home is unknown
 	}
 	homeClean := filepath.Clean(home)
 	if clean == homeClean {

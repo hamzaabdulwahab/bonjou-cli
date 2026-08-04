@@ -25,9 +25,9 @@ func (h *Handler) cmdFingerprint(arg string) (Result, error) {
 		}
 		fp := network.Fingerprint(pubkey)
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Local username:  %s\n", h.session.Config.Username))
-		sb.WriteString(fmt.Sprintf("Local public key: %s\n", pubkey))
-		sb.WriteString(fmt.Sprintf("Fingerprint:      %s\n", fp))
+		fmt.Fprintf(&sb, "Local username:  %s\n", h.session.Config.Username)
+		fmt.Fprintf(&sb, "Local public key: %s\n", pubkey)
+		fmt.Fprintf(&sb, "Fingerprint:      %s\n", fp)
 		sb.WriteString("Share the fingerprint with the peer out-of-band so they can verify it on their @users list before sending anything sensitive.")
 		return Result{Output: sb.String()}, nil
 	}
@@ -35,7 +35,7 @@ func (h *Handler) cmdFingerprint(arg string) (Result, error) {
 	// Peer fingerprint by username or IP.
 	peer, err := h.resolvePeer(arg)
 	if err != nil || peer == nil {
-		return Result{Output: fmt.Sprintf("Peer '%s' not in current discovery list.", arg)}, nil
+		return asOutput(fmt.Sprintf("Peer '%s' not in current discovery list.", arg))
 	}
 	if strings.TrimSpace(peer.PublicKey) == "" {
 		return Result{Output: fmt.Sprintf("No public key yet for '%s'. Wait for the next announcement.", arg)}, nil
@@ -70,7 +70,7 @@ func (h *Handler) cmdTrust(args string) (Result, error) {
 	}
 	peer, err := h.resolvePeer(target)
 	if err != nil || peer == nil {
-		return Result{Output: fmt.Sprintf("Peer '%s' is not in the discovery list. Wait for them to announce, then retry.", target)}, nil
+		return asOutput(fmt.Sprintf("Peer '%s' is not in the discovery list. Wait for them to announce, then retry.", target))
 	}
 	if strings.TrimSpace(peer.PublicKey) == "" {
 		return Result{Output: fmt.Sprintf("No public key yet for '%s'. Wait for the next announcement.", target)}, nil
@@ -94,7 +94,7 @@ func (h *Handler) cmdForget(args string) (Result, error) {
 		return Result{Output: "Known-peers store is not available."}, nil
 	}
 	if err := known.Forget(target); err != nil {
-		return Result{Output: fmt.Sprintf("No pinned key for '%s'.", target)}, nil
+		return asOutput(fmt.Sprintf("No pinned key for '%s'.", target))
 	}
 	return Result{Output: fmt.Sprintf("Forgot pinned key for '%s'. The next announcement under that name will pin a new key.", target)}, nil
 }
@@ -113,7 +113,7 @@ func (h *Handler) cmdKnown() (Result, error) {
 	var sb strings.Builder
 	sb.WriteString("Pinned peers:\n")
 	for _, entry := range entries {
-		sb.WriteString(fmt.Sprintf("  %-24s %s\n", entry.Username, entry.Fingerprint))
+		fmt.Fprintf(&sb, "  %-24s %s\n", entry.Username, entry.Fingerprint)
 	}
 	return Result{Output: strings.TrimRight(sb.String(), "\n")}, nil
 }

@@ -448,7 +448,7 @@ func reserveTCPPort(t *testing.T) int {
 	if err != nil {
 		t.Fatalf("reserveTCPPort listen failed: %v", err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	addr, ok := ln.Addr().(*net.TCPAddr)
 	if !ok {
