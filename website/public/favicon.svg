@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Same mark as the masthead. Colours are literal here rather than
+       custom properties, because a favicon is loaded outside the page. -->
+  <rect width="24" height="24" rx="6.75" fill="oklch(0.56 0.208 32)" />
+  <path d="M8.55 4.6v14.5" stroke="oklch(0.965 0.006 250)" stroke-width="2.5" stroke-linecap="round" />
+  <circle cx="13.35" cy="14.55" r="4.55" stroke="oklch(0.965 0.006 250)" stroke-width="2.5" fill="none" />
+</svg>

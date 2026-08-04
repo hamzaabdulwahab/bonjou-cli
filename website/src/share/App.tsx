@@ -11,22 +11,13 @@ import {
   Terminal,
 } from "lucide-react";
 
+import { Install } from "./Install";
 import { Instrument } from "./Instrument";
 import { Logo } from "./Logo";
 import { RepoStats } from "./RepoStats";
 import { useSession } from "./useSession";
 
 const REPO = "https://github.com/hamzaabdulwahab/bonjou-cli";
-const RAW = "https://raw.githubusercontent.com/hamzaabdulwahab/bonjou-cli/main";
-
-// Verbatim from README.md. An install command is executed as written, so
-// these must never be paraphrased or shortened to a nicer-looking domain.
-const INSTALL = [
-  { os: "macOS, Linux", cmd: `curl -fsSL ${RAW}/scripts/install.sh | bash` },
-  { os: "Windows", cmd: `iwr ${RAW}/scripts/install.ps1 -useb | iex` },
-  { os: "Homebrew", cmd: "brew install hamzaabdulwahab/bonjou/bonjou" },
-  { os: "WinGet", cmd: "winget install HamzaAbdulWahab.Bonjou" },
-];
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "starting",
@@ -280,19 +271,7 @@ export default function App() {
               speaks the same wire protocol.
             </p>
           </div>
-          <div className="install">
-            {INSTALL.map((entry) => (
-              <div className="cmd" key={entry.os}>
-                <span>{entry.os}</span>
-                <code>{entry.cmd}</code>
-              </div>
-            ))}
-          </div>
-          <p className="install-note">
-            Debian packages for amd64 and arm64, Scoop, and raw binaries for
-            every platform are on the{" "}
-            <a href={`${REPO}/releases/latest`}>releases page</a>.
-          </p>
+          <Install />
         </section>
 
         <section id="security" className="wrap">

@@ -1,29 +1,36 @@
 /**
- * The mark: a point with arcs opening to either side.
+ * The mark: a geometric b cut into a solid tile.
  *
- * It reads as a signal passing between two places, which is the whole
- * product. Drawn inline so it needs no asset pipeline and inherits
- * currentColor, and legible down to 16px because that is the size it
- * spends most of its life at.
+ * An app icon rather than an outline glyph, because the previous mark
+ * read as the standard wifi symbol at small sizes and so said nothing
+ * about this product in particular. A filled tile holds its shape at
+ * 16px, survives being a favicon, and matches Manrope's roundness in the
+ * bowl and the corner radius.
  */
-export function Logo({ size = 22 }: { size?: number }) {
+export function Logo({ size = 22, tone }: { size?: number; tone?: string }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
       aria-hidden="true"
       focusable="false"
     >
-      <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
-      <path d="M7.2 8.6a4.8 4.8 0 0 0 0 6.8" />
-      <path d="M16.8 8.6a4.8 4.8 0 0 1 0 6.8" />
-      <path d="M3.6 5.4a9.3 9.3 0 0 0 0 13.2" opacity="0.55" />
-      <path d="M20.4 5.4a9.3 9.3 0 0 1 0 13.2" opacity="0.55" />
+      <rect width="24" height="24" rx="6.75" fill="currentColor" />
+      <path
+        d="M8.55 4.6v14.5"
+        stroke={tone ?? "var(--paper)"}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="13.35"
+        cy="14.55"
+        r="4.55"
+        stroke={tone ?? "var(--paper)"}
+        strokeWidth="2.5"
+      />
     </svg>
   );
 }

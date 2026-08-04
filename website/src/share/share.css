@@ -195,6 +195,7 @@ a:hover {
 .wordmark svg {
   color: var(--signal);
   flex: none;
+  border-radius: 6px;
 }
 
 /* bonjou-cli is the terminal tool; this is bonjou-web. The tag keeps the
@@ -1272,15 +1273,175 @@ textarea::placeholder {
   }
 }
 
+/* ---------- install ---------- */
+
 .install {
   display: grid;
+  gap: 0;
+  max-width: 46rem;
+}
+
+.install-bar {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  background: var(--paper-2);
+  border: 1px solid var(--wire);
+  border-bottom: 0;
+  border-radius: 11px 11px 0 0;
+  width: fit-content;
+}
+
+.os-tab {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.os-tab:hover:not([aria-selected="true"]) {
+  background: var(--paper-3);
+  color: var(--ink);
+}
+
+.os-tab[aria-selected="true"] {
+  background: var(--panel);
+  color: var(--panel-text);
+}
+
+/* A command belongs in a terminal, so it is shown in one. Literal rather
+   than decorative: this is the surface the text is destined for. */
+.terminal {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.1rem 1.15rem;
+  background: var(--panel);
+  border-radius: 0 11px 11px 11px;
+  box-shadow: 0 1px 2px oklch(19% 0.02 262 / 0.14),
+    0 10px 26px -18px oklch(19% 0.02 262 / 0.45);
+}
+
+.terminal pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--panel-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.terminal .prompt {
+  flex: none;
+  color: var(--signal-bright);
+  user-select: none;
+}
+
+.copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 7px;
+  background: var(--panel-2);
+  border: 1px solid var(--panel-line);
+  color: var(--panel-dim);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.copy:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--panel-text);
+}
+
+.copy.quiet {
+  padding: 0.3rem;
+  background: transparent;
+  border-color: transparent;
+}
+
+.copy.quiet:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.alts {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.1rem;
+}
+
+.alts-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.15rem;
+}
+
+.alt {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.8rem;
+  border: 1px solid var(--wire);
+  border-radius: 9px;
+}
+
+.alt-name {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 4.5rem;
+}
+
+.alt code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--ink-2);
+  overflow-x: auto;
+  white-space: nowrap;
 }
 
 .install-note {
-  margin-top: 1rem;
+  margin-top: 1.1rem;
   font-size: 0.88rem;
   color: var(--ink-3);
+}
+
+@media (max-width: 40rem) {
+  .terminal {
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .copy {
+    align-self: flex-start;
+  }
+
+  .alt {
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+  }
+
+  .alt code {
+    flex: 1 0 100%;
+    order: 3;
+  }
 }
 
 /* ---------- FAQ ---------- */
@@ -1339,28 +1500,6 @@ textarea::placeholder {
   padding: 0.1rem 0.3rem;
   border-radius: 4px;
   background: var(--paper-2);
-}
-
-.cmd {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.7rem 0.9rem;
-  background: var(--panel);
-  color: var(--panel-text);
-  border-radius: 9px;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  overflow-x: auto;
-}
-
-.cmd span {
-  color: var(--signal-bright);
-  flex: none;
-}
-
-.cmd code {
-  white-space: nowrap;
 }
 
 .facts {
