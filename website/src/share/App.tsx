@@ -1,10 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Boxes,
   FileText,
   Github,
   Globe,
   KeyRound,
+  Menu,
   MessageSquare,
   PackageOpen,
   ShieldCheck,
@@ -18,6 +19,16 @@ import { RepoStats } from "./RepoStats";
 import { useSession } from "./useSession";
 
 const REPO = "https://github.com/hamzaabdulwahab/bonjou-cli";
+
+// The masthead links also live in the mobile drawer, so they are declared
+// once here rather than written out twice and drifting apart.
+const NAV = [
+  { href: "#how", label: "How it works" },
+  { href: "#travels", label: "What travels" },
+  { href: "#encryption", label: "Encryption" },
+  { href: "#cli", label: "Terminal" },
+  { href: "#faq", label: "FAQ" },
+];
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "starting",
@@ -37,7 +48,35 @@ function storedName(): string {
 
 export default function App() {
   const [name, setName] = useState(storedName);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const session = useSession(name, Boolean(name));
+
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
+  // A drawer left open across a rotation to landscape would cover a
+  // layout that has room for the rail anyway.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const wide = window.matchMedia("(min-width: 769px)");
+    const onWiden = () => wide.matches && setDrawerOpen(false);
+    wide.addEventListener("change", onWiden);
+    return () => wide.removeEventListener("change", onWiden);
+  }, [drawerOpen]);
+
+  // Escape closes it, and the page behind must not scroll while it is up.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawerOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [drawerOpen]);
 
   const commitName = useCallback((value: string) => {
     try {
@@ -60,11 +99,11 @@ export default function App() {
           </a>
 
           <nav>
-            <a href="#how">How it works</a>
-            <a href="#travels">What travels</a>
-            <a href="#encryption">Encryption</a>
-            <a href="#cli">Terminal</a>
-            <a href="#faq">FAQ</a>
+            {NAV.map((item) => (
+              <a key={item.href} href={item.href}>
+                {item.label}
+              </a>
+            ))}
           </nav>
 
           <div className="masthead-side">
@@ -77,6 +116,16 @@ export default function App() {
             <a className="icon-link" href={REPO} aria-label="Source on GitHub">
               <Github size={18} strokeWidth={2} aria-hidden="true" />
             </a>
+            <button
+              type="button"
+              className="hamburger"
+              aria-label="Open menu"
+              aria-expanded={drawerOpen}
+              aria-controls="mobile-drawer"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <Menu size={20} strokeWidth={2} aria-hidden="true" />
+            </button>
           </div>
         </div>
       </header>
@@ -115,6 +164,9 @@ export default function App() {
             onDecline={session.decline}
             onCreateRoom={session.createRoom}
             onJoinRoom={session.joinRoom}
+            nav={NAV}
+            drawerOpen={drawerOpen}
+            onCloseDrawer={closeDrawer}
           />
 
           <RepoStats />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
 import { Composer } from "./Composer";
 import { ConversationList } from "./ConversationList";
@@ -27,6 +28,10 @@ interface InstrumentProps {
   onDecline: (item: IncomingItem) => void;
   onCreateRoom: () => void;
   onJoinRoom: (code: string) => void;
+  /** Masthead links, repeated inside the mobile drawer. */
+  nav: { href: string; label: string }[];
+  drawerOpen: boolean;
+  onCloseDrawer: () => void;
 }
 
 const STATUS_TEXT: Record<ConnectionStatus, string> = {
@@ -59,9 +64,17 @@ export function Instrument(props: InstrumentProps) {
     onDecline,
     onCreateRoom,
     onJoinRoom,
+    nav,
+    drawerOpen,
+    onCloseDrawer,
   } = props;
 
   const [activeId, setActiveId] = useState<string>(EVERYONE);
+
+  const selectThread = (id: string) => {
+    setActiveId(id);
+    onCloseDrawer();
+  };
 
   // Names come from localStorage, which every tab of a browser profile
   // shares, so several peers legitimately arrive called the same thing.
@@ -170,9 +183,12 @@ export function Instrument(props: InstrumentProps) {
           activeId={activeId}
           networkGrouped={networkGrouped}
           code={code}
-          onSelect={setActiveId}
+          onSelect={selectThread}
           onCreateRoom={onCreateRoom}
-          onJoinRoom={onJoinRoom}
+          onJoinRoom={(value) => {
+            onJoinRoom(value);
+            onCloseDrawer();
+          }}
           onCopyLink={() => {
             void navigator.clipboard.writeText(`${window.location.origin}/r/${code}`);
             onNotice("Link copied.");
@@ -199,6 +215,62 @@ export function Instrument(props: InstrumentProps) {
           onSendFiles={onSendFiles}
         />
       )}
+
+      <div
+        className={drawerOpen ? "scrim is-open" : "scrim"}
+        onClick={onCloseDrawer}
+        aria-hidden="true"
+      />
+
+      <aside
+        id="mobile-drawer"
+        className={drawerOpen ? "drawer is-open" : "drawer"}
+        aria-label="Menu"
+        aria-hidden={!drawerOpen}
+        {...(drawerOpen ? {} : { inert: "" })}
+      >
+        <div className="drawer-head">
+          <span className="drawer-title">Menu</span>
+          <button
+            type="button"
+            className="icon-link"
+            onClick={onCloseDrawer}
+            aria-label="Close menu"
+          >
+            <X size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </div>
+
+        <nav className="drawer-nav" aria-label="Sections">
+          {nav.map((item) => (
+            <a key={item.href} href={item.href} onClick={onCloseDrawer}>
+              {item.label}
+            </a>
+          ))}
+        </nav>
+
+        <ConversationList
+          peers={peers}
+          labels={labels}
+          fingerprints={fingerprints}
+          unread={unread}
+          receivedCount={received.length}
+          activeId={activeId}
+          networkGrouped={networkGrouped}
+          code={code}
+          onSelect={selectThread}
+          onCreateRoom={onCreateRoom}
+          onJoinRoom={(value) => {
+            onJoinRoom(value);
+            onCloseDrawer();
+          }}
+          onCopyLink={() => {
+            void navigator.clipboard.writeText(`${window.location.origin}/r/${code}`);
+            onNotice("Link copied.");
+            onCloseDrawer();
+          }}
+        />
+      </aside>
 
       {notice ? (
         <div className="notice" role="status">

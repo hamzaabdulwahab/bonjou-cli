@@ -277,39 +277,6 @@ a:hover {
 /* Four short links plus the wordmark do not fit a narrow phone at full
    size. Shrinking beats wrapping into the wordmark, and beats a menu
    button for four links. */
-/* Below this the nav cannot share a line with the wordmark and status.
-   It moves to its own scrolling row rather than disappearing, so a phone
-   still has navigation. */
-@media (max-width: 60rem) {
-  :root {
-    --masthead-h: 5.9rem;
-  }
-
-  .masthead-inner {
-    flex-wrap: wrap;
-    padding-block: 0.5rem;
-    row-gap: 0.4rem;
-  }
-
-  .masthead nav {
-    order: 3;
-    flex: 1 0 100%;
-    gap: 1.1rem;
-    font-size: 0.82rem;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 0.2rem;
-    /* Full-bleed so the row scrolls edge to edge instead of stopping
-       inside the gutter. */
-    margin-inline: calc(var(--gutter) * -1);
-    padding-inline: var(--gutter);
-  }
-
-  .masthead nav::-webkit-scrollbar {
-    display: none;
-  }
-}
-
 @media (max-width: 30rem) {
   .wordmark {
     font-size: 1rem;
@@ -492,22 +459,9 @@ textarea::placeholder {
   min-height: 0;
 }
 
-@media (min-width: 62rem) {
+@media (min-width: 769px) {
   .instrument-body {
     grid-template-columns: 17rem minmax(0, 1fr);
-  }
-}
-
-/* Narrow screens stack the rail above the thread, so a viewport-relative
-   height would squeeze the conversation to nothing. */
-@media (max-width: 61.99rem) {
-  .instrument {
-    height: auto;
-    max-height: none;
-  }
-
-  .thread-body {
-    max-height: 26rem;
   }
 }
 
@@ -1038,52 +992,178 @@ textarea::placeholder {
 
 /* ---------- narrow ---------- */
 
-/* The rail becomes a scrolling row of chips above the thread rather than
-   a screen you navigate into, so the composer stays one tap away. */
-@media (max-width: 61.99rem) {
-  .rail {
-    flex-direction: column;
-    gap: 0.6rem;
-    padding: 0.7rem 0.8rem;
+/* ---------- drawer ---------- */
+
+/* Hidden above the breakpoint: the rail is on screen there, and a second
+   copy of the same list would be duplicate interactive content. */
+.hamburger,
+.drawer,
+.scrim {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hamburger {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem;
+    border-radius: 7px;
+    background: transparent;
+    border: 1px solid var(--wire);
+    color: var(--ink-2);
   }
 
-  .rail > .rail-label {
+  .hamburger:hover:not(:disabled) {
+    background: var(--paper-2);
+    color: var(--ink);
+  }
+
+  /* The masthead nav and the rail both move into the drawer. */
+  .masthead nav,
+  .instrument-body > .rail {
     display: none;
   }
 
-  .rail-list {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 0.4rem;
-    padding-bottom: 0.15rem;
-    scrollbar-width: thin;
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: oklch(19% 0.02 262 / 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .rail-list li {
-    flex: none;
+  .scrim.is-open {
+    opacity: 1;
+    pointer-events: auto;
   }
 
-  .chip {
-    width: auto;
-    border-color: var(--panel-line);
+  .drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: fixed;
+    z-index: 41;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: min(19rem, 86vw);
+    padding: 1rem 0.9rem calc(1rem + env(safe-area-inset-bottom));
+    background: var(--panel);
+    color: var(--panel-text);
+    border-left: 1px solid var(--panel-line);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* transform rather than inset, so opening does not run layout. */
+    transform: translateX(100%);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .chip-name {
-    max-width: 9rem;
+  .drawer.is-open {
+    transform: none;
   }
 
-  .rail-foot {
-    margin-top: 0;
-    padding-top: 0.6rem;
+  .drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
-  .row {
-    max-width: 100%;
+  .drawer-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--panel-dim);
   }
 
+  /* It is a button, so the primary fill applies unless cleared. */
+  .drawer-head .icon-link {
+    background: transparent;
+    border-color: transparent;
+    color: var(--panel-dim);
+  }
+
+  .drawer-head .icon-link:hover {
+    background: var(--panel-2);
+    color: var(--panel-text);
+  }
+
+  .drawer-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  .drawer-nav a {
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--panel-text);
+    text-decoration: none;
+  }
+
+  .drawer-nav a:hover {
+    background: var(--panel-2);
+  }
+
+  .drawer .rail {
+    padding: 0;
+    flex: 1;
+  }
+
+  /* ---------- fixed chat viewport ---------- */
+
+  /* The hero shrinks so the tool starts near the top of the screen.
+     Without this the instrument began 290px down and its composer sat
+     below the fold, which is the opposite of pinning it. */
+  .hero {
+    padding-top: 1rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .hero-copy {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.65rem, 5.6vw, 2rem);
+  }
+
+  .hero .lede {
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+
+  /* Without a fixed height the page grew with every message and the
+     composer walked off the bottom. The subtrahend covers the masthead
+     and the trimmed hero above, so the whole tool including its composer
+     lands inside the first screen. dvh rather than vh so a collapsing
+     mobile browser toolbar is accounted for. */
+  .instrument {
+    height: calc(100dvh - 14rem);
+    min-height: 24rem;
+  }
+
+  .instrument-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thread-body {
+    overflow-y: auto;
+  }
+
+  /* Last in a fixed-height column, so it holds the bottom while the
+     thread above it takes the remaining space and scrolls. */
   .composer {
+    flex: none;
     flex-wrap: wrap;
+    padding-bottom: calc(0.8rem + env(safe-area-inset-bottom));
   }
 
   .composer textarea {
@@ -1093,6 +1173,10 @@ textarea::placeholder {
   .composer-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .row {
+    max-width: 100%;
   }
 }
 
