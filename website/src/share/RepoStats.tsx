@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GitFork, Star, Tag } from "lucide-react";
+import { GitFork, Github, Star, Tag } from "lucide-react";
 
 /**
  * Live repository figures, fetched from the public GitHub API.
@@ -40,7 +40,7 @@ function writeCache(stats: Stats): void {
   }
 }
 
-export function RepoStats() {
+export function RepoStats({ compact = false }: { compact?: boolean }) {
   const [stats, setStats] = useState<Stats | null>(readCache);
 
   useEffect(() => {
@@ -78,6 +78,23 @@ export function RepoStats() {
     };
   }, []);
 
+  // The masthead has room for one figure, not three. Stars is the one
+  // people read, and it is dropped entirely rather than shown as a dash
+  // when GitHub rate-limits the request.
+  if (compact) {
+    if (typeof stats?.stars !== "number") return null;
+    return (
+      <a
+        className="repo-pill"
+        href={`https://github.com/${REPO}`}
+        aria-label={`${stats.stars} stars on GitHub`}
+      >
+        <Github size={14} strokeWidth={1.75} aria-hidden="true" />
+        <span>{compactCount(stats.stars)}</span>
+      </a>
+    );
+  }
+
   const items = [
     stats?.release ? { icon: Tag, label: "Latest", value: stats.release } : null,
     typeof stats?.stars === "number"
@@ -98,11 +115,16 @@ export function RepoStats() {
     >
       {items.map(({ icon: Icon, label, value }) => (
         <span className="repo-stat" key={label}>
-          <Icon size={14} strokeWidth={2} aria-hidden="true" />
+          <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
           <span className="repo-stat-value">{value}</span>
           <span className="repo-stat-label">{label}</span>
         </span>
       ))}
     </a>
   );
+}
+
+function compactCount(value: number): string {
+  if (value < 1000) return String(value);
+  return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
 }

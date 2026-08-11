@@ -3,9 +3,9 @@
   "buildCommand": "cd website && npm run build",
   "outputDirectory": "website/dist",
   "rewrites": [
-    { "source": "/", "destination": "/share.html" },
-    { "source": "/r/:code", "destination": "/share.html" },
-    { "source": "/share", "destination": "/share.html" }
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/r/:code", "destination": "/index.html" },
+    { "source": "/share", "destination": "/index.html" }
   ],
   "headers": [
     {

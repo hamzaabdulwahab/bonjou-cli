@@ -131,6 +131,67 @@ export async function uploadStream(options: UploadOptions): Promise<void> {
   await postEnd(relayBase, transferId, token, signal);
 }
 
+export interface ChannelUploadOptions {
+  /** Usually a PeerLink. Narrowed to what sending actually needs. */
+  channel: { sendData: (bytes: Uint8Array) => Promise<void> };
+  source: ReadableStream<Uint8Array>;
+  streamKey: CryptoKey;
+  onProgress?: (plaintextBytesSent: number) => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * Seals and sends a file straight to the recipient, one AEAD frame per
+ * data-channel message.
+ *
+ * The sealing is identical to the relay path and deliberately so, even
+ * though the channel is already encrypted by DTLS: one wire format means
+ * the receiver decrypts the same way either way, and the session
+ * fingerprint keeps meaning what the security notes say it means.
+ *
+ * Frames go out singly rather than batched into 8 MB bodies, because
+ * there is no per-request overhead to amortise here and smaller messages
+ * let backpressure act sooner.
+ */
+export async function sendOverChannel(
+  options: ChannelUploadOptions,
+): Promise<void> {
+  const { channel, source, streamKey, onProgress, signal } = options;
+
+  const writer = new ChunkedFrameWriter(streamKey);
+  let plaintextSent = 0;
+
+  const seal = async (plaintext: Uint8Array): Promise<void> => {
+    await channel.sendData(await writer.seal(plaintext));
+    plaintextSent += plaintext.length;
+    onProgress?.(plaintextSent);
+  };
+
+  const pending: Uint8Array[] = [];
+  let pendingBytes = 0;
+  const reader = source.getReader();
+
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.length === 0) continue;
+      pending.push(value);
+      pendingBytes += value.length;
+      while (pendingBytes >= STREAM_CHUNK_PLAIN_BYTES) {
+        await seal(takeExact(pending, STREAM_CHUNK_PLAIN_BYTES));
+        pendingBytes -= STREAM_CHUNK_PLAIN_BYTES;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (pendingBytes > 0) await seal(takeExact(pending, pendingBytes));
+  onProgress?.(plaintextSent);
+}
+
 /** Convenience for the single-file case. */
 export function uploadFile(
   options: Omit<UploadOptions, "source" | "totalBytes"> & { file: File },
@@ -225,24 +286,161 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
  * exists in memory.
  */
 export async function startDownload(options: DownloadOptions): Promise<void> {
-  const registration = await registerServiceWorker();
-  const worker = registration.active;
-  if (!worker) {
-    throw new Error("the download helper is not ready yet — try again");
-  }
-
+  const worker = await activeWorker();
   await requestFromWorker(worker, {
     type: "bonjou-prepare",
+    mode: "relay",
     transferId: options.transferId,
     url: `${options.relayBase}/t/${options.transferId}?token=${encodeURIComponent(options.token)}`,
     filename: options.filename,
     plaintextSize: options.plaintextSize,
     streamKeyHex: toHex(options.streamKey),
   });
+  openDownloadFrame(options.transferId);
+}
 
+export interface DirectDownloadOptions {
+  transferId: string;
+  filename: string;
+  plaintextSize: number;
+  streamKey: Uint8Array;
+}
+
+/**
+ * Where ciphertext from a direct connection goes. Writing waits when the
+ * browser is behind, which is what stops a LAN-speed sender from
+ * outrunning the disk.
+ */
+export interface DownloadSink {
+  write(bytes: Uint8Array): Promise<void>;
+  close(): void;
+  abort(reason: string): void;
+}
+
+/**
+ * Prepares a download fed by the page rather than by the relay, and
+ * resolves once the worker is actually reading it.
+ *
+ * Waiting for that confirmation is the point: a MessagePort queues without
+ * limit, so bytes posted before the stream exists would pile up somewhere
+ * backpressure cannot reach.
+ */
+export async function startDirectDownload(
+  options: DirectDownloadOptions,
+): Promise<DownloadSink> {
+  const worker = await activeWorker();
+  const data = new MessageChannel();
+
+  await requestFromWorker(
+    worker,
+    {
+      type: "bonjou-prepare",
+      mode: "p2p",
+      transferId: options.transferId,
+      filename: options.filename,
+      plaintextSize: options.plaintextSize,
+      streamKeyHex: toHex(options.streamKey),
+    },
+    [data.port2],
+  );
+
+  const port = data.port1;
+  let paused = false;
+  let releaseResume: (() => void) | null = null;
+  let opened = false;
+  let onOpen: ((err?: Error) => void) | null = null;
+
+  port.onmessage = (event) => {
+    const message = event.data as {
+      open?: boolean;
+      pause?: boolean;
+      resume?: boolean;
+      cancelled?: string;
+    };
+    if (message?.open) {
+      opened = true;
+      onOpen?.();
+      return;
+    }
+    if (message?.pause) {
+      paused = true;
+      return;
+    }
+    if (message?.resume) {
+      paused = false;
+      releaseResume?.();
+      releaseResume = null;
+      return;
+    }
+    if (message?.cancelled) {
+      // The browser dropped the download, so stop feeding it.
+      paused = false;
+      releaseResume?.();
+      releaseResume = null;
+      onOpen?.(new Error("the download was cancelled"));
+    }
+  };
+
+  openDownloadFrame(options.transferId);
+
+  await new Promise<void>((resolve, reject) => {
+    if (opened) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(
+      () => reject(new Error("the download helper never started reading")),
+      10_000,
+    );
+    onOpen = (err) => {
+      clearTimeout(timer);
+      onOpen = null;
+      if (err) reject(err);
+      else resolve();
+    };
+  });
+
+  return {
+    async write(bytes) {
+      if (paused) {
+        await new Promise<void>((resolve) => {
+          releaseResume = resolve;
+        });
+      }
+      // Transferring detaches the buffer, so hand over a copy rather than
+      // the caller's view of a buffer it may still be reading.
+      const copy = bytes.slice();
+      port.postMessage({ bytes: copy.buffer }, [copy.buffer]);
+    },
+    close() {
+      port.postMessage({ done: true });
+      port.close();
+    },
+    abort(reason) {
+      port.postMessage({ error: reason });
+      port.close();
+    },
+  };
+}
+
+async function activeWorker(): Promise<ServiceWorker> {
+  const registration = await registerServiceWorker();
+  const worker = registration.active;
+  if (!worker) {
+    throw new Error("the download helper is not ready yet — try again");
+  }
+  return worker;
+}
+
+/**
+ * Navigates a hidden iframe at the download URL. The worker intercepts
+ * that request and answers with a decrypting stream, which the browser
+ * saves straight to disk.
+ */
+function openDownloadFrame(transferId: string): void {
   const frame = document.createElement("iframe");
   frame.hidden = true;
-  frame.src = `/dl/${options.transferId}`;
+  frame.src = `/dl/${transferId}`;
   document.body.appendChild(frame);
   // The download detaches from the iframe once the browser takes over;
   // leaving it in the DOM only leaks a node.
@@ -252,6 +450,7 @@ export async function startDownload(options: DownloadOptions): Promise<void> {
 function requestFromWorker(
   worker: ServiceWorker,
   message: Record<string, unknown>,
+  extraPorts: MessagePort[] = [],
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const channel = new MessageChannel();
@@ -265,7 +464,8 @@ function requestFromWorker(
       if (data?.ok) resolve();
       else reject(new Error(data?.error ?? "the download helper failed"));
     };
-    worker.postMessage(message, [channel.port2]);
+    // The reply port is first; the worker reads any data port after it.
+    worker.postMessage(message, [channel.port2, ...extraPorts]);
   });
 }
 

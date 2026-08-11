@@ -1,12 +1,19 @@
 /**
  * Bonjou download helper.
  *
- * A receiver's bytes arrive from the relay as ciphertext. Fetching them
- * normally would save an encrypted file, and decrypting in the page would
- * mean holding the whole thing in memory — impossible at multi-gigabyte
- * sizes. Instead this worker intercepts the download URL, streams the
- * ciphertext through a decrypting transform, and returns a response the
- * browser writes straight to disk.
+ * A receiver's bytes arrive as ciphertext. Fetching them normally would
+ * save an encrypted file, and decrypting in the page would mean holding
+ * the whole thing in memory — impossible at multi-gigabyte sizes. Instead
+ * this worker intercepts the download URL, streams the ciphertext through
+ * a decrypting transform, and returns a response the browser writes
+ * straight to disk.
+ *
+ * Ciphertext reaches it two ways. Over the relay it is an ordinary fetch.
+ * Over a direct connection the bytes arrive as data-channel messages in
+ * the page, which a worker cannot reach into, so the page hands over a
+ * MessagePort and the worker builds a stream fed by messages on it.
+ * Everything past that point is identical: same frames, same per-chunk
+ * authentication, same streaming write to disk.
  *
  * Deliberately dependency-free and hand-written: it runs outside the
  * bundler, so it carries its own copy of the frame format rather than
@@ -32,14 +39,22 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
   const data = event.data;
   const port = event.ports && event.ports[0];
+  // Present only for a direct transfer, where it carries the ciphertext.
+  const dataPort = event.ports && event.ports[1];
   if (!data || data.type !== "bonjou-prepare") return;
 
   try {
     if (!/^[0-9a-f]{16}$/.test(String(data.transferId))) {
       throw new Error("invalid transfer id");
     }
+    const mode = data.mode === "p2p" ? "p2p" : "relay";
+    if (mode === "p2p" && !dataPort) {
+      throw new Error("a direct transfer needs a data port");
+    }
     pending.set(data.transferId, {
+      mode,
       url: data.url,
+      dataPort,
       filename: String(data.filename || "download"),
       plaintextSize: Number(data.plaintextSize) || 0,
       streamKeyHex: String(data.streamKeyHex || ""),
@@ -72,20 +87,26 @@ async function handleDownload(transferId) {
   // again rather than silently re-opening a stream.
   pending.delete(transferId);
 
-  let upstream;
-  try {
-    upstream = await fetch(record.url);
-  } catch (err) {
-    return new Response(`could not reach the relay: ${err}`, {
-      status: 502,
-      headers: { "Content-Type": "text/plain" },
-    });
-  }
-  if (!upstream.ok || !upstream.body) {
-    return new Response(`the relay refused the download (${upstream.status})`, {
-      status: 502,
-      headers: { "Content-Type": "text/plain" },
-    });
+  let ciphertext;
+  if (record.mode === "p2p") {
+    ciphertext = portStream(record.dataPort);
+  } else {
+    let upstream;
+    try {
+      upstream = await fetch(record.url);
+    } catch (err) {
+      return new Response(`could not reach the relay: ${err}`, {
+        status: 502,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    if (!upstream.ok || !upstream.body) {
+      return new Response(`the relay refused the download (${upstream.status})`, {
+        status: 502,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    ciphertext = upstream.body;
   }
 
   const key = await crypto.subtle.importKey(
@@ -96,7 +117,7 @@ async function handleDownload(transferId) {
     ["decrypt"],
   );
 
-  const plaintext = upstream.body.pipeThrough(decryptingStream(key));
+  const plaintext = ciphertext.pipeThrough(decryptingStream(key));
 
   return new Response(plaintext, {
     status: 200,
@@ -108,6 +129,68 @@ async function handleDownload(transferId) {
       "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+/**
+ * Wraps a MessagePort as a readable stream of ciphertext, for bytes that
+ * arrived over a direct connection rather than the relay.
+ *
+ * The relay path gets flow control free from TCP. This one has to say so
+ * out loud: the page is told to pause once the queue is full and to resume
+ * when the browser has drained it to disk. Without that, a fast sender on
+ * a LAN outruns a slow disk and the queue grows until the worker dies.
+ */
+function portStream(port) {
+  let controller;
+  let paused = false;
+
+  const stream = new ReadableStream(
+    {
+      start(c) {
+        controller = c;
+      },
+      pull() {
+        // Called only when there is room again.
+        if (paused) {
+          paused = false;
+          port.postMessage({ resume: true });
+        }
+      },
+      cancel(reason) {
+        port.postMessage({ cancelled: String(reason) });
+        port.close();
+      },
+    },
+    new ByteLengthQueuingStrategy({ highWaterMark: 8 * 1024 * 1024 }),
+  );
+
+  port.onmessage = (event) => {
+    const message = event.data;
+    if (!message) return;
+    if (message.bytes) {
+      controller.enqueue(new Uint8Array(message.bytes));
+      if (controller.desiredSize <= 0 && !paused) {
+        paused = true;
+        port.postMessage({ pause: true });
+      }
+      return;
+    }
+    if (message.done) {
+      controller.close();
+      port.close();
+      return;
+    }
+    if (message.error) {
+      controller.error(new Error(String(message.error)));
+      port.close();
+    }
+  };
+
+  // Tells the page the stream exists and is being read, so it can let the
+  // sender start. Anything sent earlier would queue on the port with no
+  // ceiling, which is the one place backpressure could not reach.
+  port.postMessage({ open: true });
+  return stream;
 }
 
 /**
@@ -228,6 +311,13 @@ function contentDisposition(filename) {
 function reapStale() {
   const cutoff = Date.now() - 10 * 60 * 1000;
   for (const [id, record] of pending) {
-    if (record.createdAt < cutoff) pending.delete(id);
+    if (record.createdAt >= cutoff) continue;
+    // A direct transfer's port would otherwise keep the page's sink alive
+    // waiting on a stream nobody is going to read.
+    if (record.dataPort) {
+      record.dataPort.postMessage({ error: "the download was never started" });
+      record.dataPort.close();
+    }
+    pending.delete(id);
   }
 }

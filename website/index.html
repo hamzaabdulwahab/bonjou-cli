@@ -8,14 +8,31 @@
       name="description"
       content="Send messages, files, and folders straight to anyone on the same Wi-Fi. Encrypted in your browser, relayed without being stored, no account needed."
     />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <script>
+      // The stored theme is applied before anything paints. Without this a
+      // dark-mode visitor sees a white page for as long as the bundle
+      // takes to parse, which on a phone is plainly visible.
+      (function () {
+        try {
+          var saved = localStorage.getItem("bonjou.theme");
+          var dark =
+            saved === "dark" ||
+            (saved !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

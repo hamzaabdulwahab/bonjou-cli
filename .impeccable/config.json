@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-08-11T18:51:25.650Z",
+        "reason": "User specified a Geist/Inter/system-ui stack; Geist is the shipped brand face"
+      }
+    ]
+  }
+}

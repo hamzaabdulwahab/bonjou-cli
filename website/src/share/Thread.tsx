@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, ChevronLeft, ShieldCheck } from "lucide-react";
 
 import { IncomingRow, MessageRow, OutgoingRow } from "./EventRow";
+import { FileIcon } from "./FileIcon";
 import { formatBytes } from "./transfer";
 import {
   EVERYONE,
@@ -20,8 +21,12 @@ interface ThreadProps {
   events: ThreadEvent[];
   received: IncomingItem[];
   labels: Record<string, string>;
+  canVerify: boolean;
   onApprove: (item: IncomingItem) => void;
   onDecline: (item: IncomingItem) => void;
+  onVerify: () => void;
+  onHistory: () => void;
+  onBack: () => void;
 }
 
 /** Rows are events, except consecutive outgoing items of one fan-out. */
@@ -31,8 +36,20 @@ type Row =
   | { key: string; kind: "outgoing"; items: OutgoingItem[] };
 
 export function Thread(props: ThreadProps) {
-  const { threadId, title, subtitle, events, received, labels, onApprove, onDecline } =
-    props;
+  const {
+    threadId,
+    title,
+    subtitle,
+    events,
+    received,
+    labels,
+    canVerify,
+    onApprove,
+    onDecline,
+    onVerify,
+    onHistory,
+    onBack,
+  } = props;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinnedRef = useRef(true);
@@ -122,7 +139,7 @@ export function Thread(props: ThreadProps) {
       ) : (
         <ul className="rows">
           {received.map((item) => (
-            <li className="row row-in" key={item.requestId}>
+            <li className="row" key={item.requestId}>
               <div className="row-meta">
                 <span className="row-who">{labels[item.from] ?? item.fromName}</span>
                 <time dateTime={new Date(item.at).toISOString()}>
@@ -132,12 +149,24 @@ export function Thread(props: ThreadProps) {
                   })}
                 </time>
               </div>
-              <div className="card">
+              <div className="card is-done">
                 <div className="card-head">
+                  <span className="card-icon">
+                    <FileIcon
+                      name={item.name}
+                      folder={Boolean(item.note)}
+                      size={18}
+                    />
+                  </span>
                   <span className="card-name">{item.name}</span>
                   <span className="card-size">{formatBytes(item.size)}</span>
                 </div>
-                <span className="status is-done">Saved to your downloads</span>
+                <div className="card-foot">
+                  <span className="card-state">Saved to your downloads</span>
+                  {item.path ? (
+                    <span className={`path-tag is-${item.path}`}>{item.path}</span>
+                  ) : null}
+                </div>
               </div>
             </li>
           ))}
@@ -145,8 +174,9 @@ export function Thread(props: ThreadProps) {
       )
     ) : rows.length === 0 ? (
       <p className="empty">
-        No messages here yet. Anything you send goes only to
-        {threadId === EVERYONE ? " everyone reachable" : ` ${title}`}.
+        Nothing here yet. Whatever you send goes to
+        {threadId === EVERYONE ? " everyone reachable" : ` ${title}`} and to
+        nobody else.
       </p>
     ) : (
       <ul className="rows">
@@ -179,12 +209,51 @@ export function Thread(props: ThreadProps) {
   return (
     <section className="thread" aria-label={title}>
       <header className="thread-head">
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
+        <button
+          type="button"
+          className="icon-btn thread-back"
+          onClick={onBack}
+          aria-label="Back to the list"
+        >
+          <ChevronLeft size={17} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+
+        <div className="thread-title">
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+
+        <div className="thread-tools">
+          {/*
+            The labels are wrapped so a narrow viewport can drop them and
+            leave the icons, which is the only way two controls and a title
+            fit across 390px.
+          */}
+          {canVerify ? (
+            <button
+              type="button"
+              className="btn-tool"
+              onClick={onVerify}
+              aria-label="Verify security fingerprint"
+            >
+              <ShieldCheck size={14} strokeWidth={1.75} aria-hidden="true" />
+              <span>Verify</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="btn-tool"
+            onClick={onHistory}
+            aria-label="This session's transfers"
+          >
+            <ArrowRightLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+            <span>Transfers</span>
+          </button>
+        </div>
       </header>
 
       <div className="thread-scroll">
-        <div className="thread-body" ref={scrollRef} onScroll={onScroll}>
+        <div className="thread-body bj-scroll" ref={scrollRef} onScroll={onScroll}>
           {body}
         </div>
 
@@ -197,7 +266,7 @@ export function Thread(props: ThreadProps) {
               missed > 0 ? `Jump to ${missed} new items` : "Jump to the newest"
             }
           >
-            <ArrowDown size={15} strokeWidth={2.5} aria-hidden="true" />
+            <ArrowDown size={15} strokeWidth={1.75} aria-hidden="true" />
             {missed > 0 ? <span>{missed}</span> : null}
           </button>
         ) : null}

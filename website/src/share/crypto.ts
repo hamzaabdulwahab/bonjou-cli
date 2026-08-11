@@ -207,6 +207,14 @@ export const ENVELOPE_KINDS = {
   fileReject: "file_reject",
   file: "file",
   ack: "ack",
+  // Browser-only. Signalling for a direct connection rides the sealed
+  // envelope, so the relay forwards offers and candidates it cannot read
+  // and needs no knowledge of WebRTC at all. The Go CLI ignores these:
+  // it discovers peers by UDP broadcast and already talks to them
+  // directly, so it has nothing to negotiate.
+  rtcOffer: "rtc_offer",
+  rtcAnswer: "rtc_answer",
+  rtcIce: "rtc_ice",
 } as const;
 
 /**

@@ -5,7 +5,6 @@
 
   [![Go Version](https://img.shields.io/github/go-mod/go-version/hamzaabdulwahab/bonjou-cli?style=flat-square&logo=go)](https://golang.org/)
   [![Release](https://img.shields.io/github/v/release/hamzaabdulwahab/bonjou-cli?style=flat-square)](https://github.com/hamzaabdulwahab/bonjou-cli/releases)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
   [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)]()
 </div>
 
@@ -30,7 +29,6 @@ No servers to configure. No internet connection required. No accounts to create.
 - [🛠️ Architecture & Security](#️-architecture--security)
 - [💻 Development](#-development)
 - [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
 
 ---
 
@@ -244,8 +242,3 @@ Contributions are heavily encouraged! Bonjou is built to be simple, hackable, an
 5. Push to the branch (`git push origin feature/amazing-feature`).
 6. Open a Pull Request.
 
----
-
-## 📄 License
-
-Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.

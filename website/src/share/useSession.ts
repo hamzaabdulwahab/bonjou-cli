@@ -24,10 +24,19 @@ import { RelayClient, describe, type ConnectionStatus, type Peer } from "./relay
 import {
   cipherSizeFor,
   registerServiceWorker,
+  sendOverChannel,
   serviceWorkerSupported,
+  startDirectDownload,
   startDownload,
   uploadStream,
+  type DownloadSink,
 } from "./transfer";
+import {
+  LinkRegistry,
+  isRtcSignalKind,
+  rtcSupported,
+  type ChannelControl,
+} from "./webrtc";
 import { entriesFor, folderNameFor, zipSize, zipStream } from "./zip";
 
 export const RELAY_BASE = (
@@ -35,6 +44,21 @@ export const RELAY_BASE = (
 ).replace(/\/$/, "");
 
 const RELAY_WS = `${RELAY_BASE.replace(/^http/, "ws")}/ws`;
+
+/**
+ * How long to wait for a direct connection before giving up and using the
+ * relay. Negotiation starts when the file is offered, so by the time
+ * somebody has approved it this has usually already resolved; the wait
+ * only matters when approval is instant.
+ */
+const DIRECT_WAIT_MS = 5000;
+
+/**
+ * Which route a transfer took. Worth surfacing: it is the difference
+ * between a LAN and a round trip to Mumbai, and otherwise people are left
+ * guessing why one send was fast and another was not.
+ */
+export type TransferPath = "direct" | "relayed";
 
 export type OutgoingState = "offered" | "sending" | "done" | "failed" | "declined";
 export type IncomingState =
@@ -63,6 +87,8 @@ export interface OutgoingItem {
   sentBytes: number;
   error?: string;
   at: number;
+  /** Set once the route is chosen, at the moment sending starts. */
+  path?: TransferPath;
   /**
    * Sending one file to several people fans out into one transfer each,
    * because a shared secret is per pair. groupId ties those back together
@@ -84,6 +110,19 @@ export interface IncomingItem {
   at: number;
   /** Extra human detail from the sender, such as a folder's file count. */
   note?: string;
+  /** Set once the route is known, at the moment bytes start arriving. */
+  path?: TransferPath;
+  /**
+   * Sealed bytes arrived so far, against `cipherSizeFor(size)`. Counted in
+   * ciphertext because that is what this side can actually observe, and
+   * the ratio is exact either way.
+   *
+   * Only the direct path can fill this in: a relayed download is streamed
+   * to disk inside the service worker, which the page never sees. Left
+   * undefined there rather than estimated, so the progress bar can be
+   * honestly indeterminate instead of inventing a number.
+   */
+  receivedBytes?: number;
 }
 
 export interface ChatLine {
@@ -125,6 +164,58 @@ function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      },
+    );
+  });
+}
+
+/**
+ * Progress arrives once per 64 KiB frame, which on a direct connection is
+ * several hundred React renders a second for a number nobody can read that
+ * fast. Coalesce to roughly ten a second, leading and trailing, so the
+ * last value always lands and a finished transfer never rests a frame
+ * short of complete.
+ */
+const PROGRESS_INTERVAL_MS = 100;
+
+function throttleProgress(emit: (bytes: number) => void): (bytes: number) => void {
+  let lastAt = 0;
+  let latest = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  return (bytes: number) => {
+    latest = bytes;
+    const now = Date.now();
+    const since = now - lastAt;
+    if (since >= PROGRESS_INTERVAL_MS) {
+      lastAt = now;
+      emit(latest);
+      return;
+    }
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      lastAt = Date.now();
+      emit(latest);
+    }, PROGRESS_INTERVAL_MS - since);
+  };
+}
+
 function roomCodeFromLocation(): string {
   const fromPath = /^\/r\/([^/]+)/.exec(window.location.pathname);
   if (fromPath) return decodeURIComponent(fromPath[1]);
@@ -149,9 +240,32 @@ export function useSession(name: string, active: boolean) {
   const incomingRef = useRef(new Map<string, IncomingItem>());
   const transferOwner = useRef(new Map<string, string>());
   // One transfer at a time per peer; the rest wait. Two concurrent
-  // uploads to the same person would race for the same transfer_ready.
+  // uploads to the same person would race for the same transfer_ready,
+  // and would interleave frames on a shared data channel.
   const busyPeers = useRef(new Set<string>());
   const queued = useRef<string[]>([]);
+
+  const linksRef = useRef<LinkRegistry | null>(null);
+  /** The one direct download in flight per peer, and where its bytes go. */
+  const activeReceive = useRef(
+    new Map<
+      string,
+      {
+        requestId: string;
+        sink: DownloadSink;
+        /** Sealed bytes taken in so far, for the progress bar. */
+        received: number;
+        report: (bytes: number) => void;
+      }
+    >(),
+  );
+  /** Senders waiting for the receiver to confirm its download is open. */
+  const readyWaiters = useRef(
+    new Map<string, { resolve: () => void; reject: (err: Error) => void }>(),
+  );
+  // pumpQueue starts a send, and a finished send pumps the queue again.
+  // One of the two references has to be late-bound; this is it.
+  const beginSend = useRef<(requestId: string) => void>(() => {});
 
   const syncOutgoing = () => setOutgoing([...outgoingRef.current.values()]);
   const syncIncoming = () => setIncoming([...incomingRef.current.values()]);
@@ -178,8 +292,7 @@ export function useSession(name: string, active: boolean) {
 
   /** Starts the next queued send for a peer that has gone idle. */
   const pumpQueue = useCallback(() => {
-    const client = clientRef.current;
-    if (!client) return;
+    if (!clientRef.current) return;
     const stillQueued: string[] = [];
     for (const requestId of queued.current) {
       const item = outgoingRef.current.get(requestId);
@@ -190,7 +303,7 @@ export function useSession(name: string, active: boolean) {
       }
       busyPeers.current.add(item.peerId);
       patchOutgoing(requestId, { state: "sending" });
-      client.beginTransfer(item.peerId, cipherSizeFor(item.size));
+      beginSend.current(requestId);
     }
     queued.current = stillQueued;
   }, [patchOutgoing]);
@@ -208,6 +321,42 @@ export function useSession(name: string, active: boolean) {
 
     const client = new RelayClient(RELAY_WS, identity, name);
     clientRef.current = client;
+
+    // Signalling is just another sealed envelope, so the relay forwards
+    // offers and candidates without being able to read them and learns
+    // nothing it did not already know.
+    if (rtcSupported()) {
+      const selfKey = toHex(identity.publicKey);
+      linksRef.current = new LinkRegistry(
+        (peerId) => selfKey < (client.peer(peerId)?.pubkey ?? ""),
+        (peerId, signal) => {
+          void client
+            .sendEnvelope(peerId, {
+              kind: signal.kind,
+              from: name,
+              from_ip: "",
+              to: "",
+              name: "",
+              size: 0,
+              ts: Math.floor(Date.now() / 1000),
+              message: signal.payload,
+              checksum: "",
+              hmac: "",
+            })
+            .catch(() => {
+              // A candidate that cannot be delivered just means this
+              // connection will not form, and the relay path still will.
+            });
+        },
+        (link) => {
+          link.listen({
+            onControl: (message) => handleChannelControl(link.peerId, message),
+            onData: (bytes) => handleChannelData(link.peerId, bytes),
+          });
+          link.onDisconnect(() => handleLinkClosed(link.peerId));
+        },
+      );
+    }
 
     const unsubscribe = client.on((event) => {
       switch (event.type) {
@@ -234,6 +383,9 @@ export function useSession(name: string, active: boolean) {
 
         case "roster": {
           setPeers(event.peers);
+          // A peer that left and came back has a new id and new keys, so
+          // its old connection is worthless and must be renegotiated.
+          linksRef.current?.retain(event.peers.map((peer) => peer.id));
           void (async () => {
             const next: Record<string, string> = {};
             for (const peer of event.peers) {
@@ -291,6 +443,8 @@ export function useSession(name: string, active: boolean) {
       unsubscribe();
       client.close();
       clientRef.current = null;
+      linksRef.current?.closeAll();
+      linksRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, name]);
@@ -304,6 +458,15 @@ export function useSession(name: string, active: boolean) {
     async (from: string, envelope: Envelope) => {
       const client = clientRef.current;
       if (!client) return;
+
+      if (isRtcSignalKind(envelope.kind)) {
+        // An offer arriving is itself the signal that this peer wants a
+        // connection, so creating the link here is what answers it.
+        await linksRef.current
+          ?.get(from)
+          .accept({ kind: envelope.kind, payload: envelope.message });
+        return;
+      }
 
       if (envelope.kind === ENVELOPE_KINDS.message) {
         setChat((lines) => [
@@ -337,6 +500,10 @@ export function useSession(name: string, active: boolean) {
         };
         incomingRef.current.set(item.requestId, item);
         syncIncoming();
+        // Negotiate now, while this is being read. Connecting takes a
+        // moment, and starting it at approval would spend that moment
+        // with somebody watching a stalled progress bar.
+        linksRef.current?.get(from).start();
         return;
       }
 
@@ -387,7 +554,9 @@ export function useSession(name: string, active: boolean) {
             source: item.openStream(),
             totalBytes: item.size,
             streamKey,
-            onProgress: (sent) => patchOutgoing(item.requestId, { sentBytes: sent }),
+            onProgress: throttleProgress((sent) =>
+              patchOutgoing(item.requestId, { sentBytes: sent }),
+            ),
           });
           patchOutgoing(item.requestId, { state: "done" });
         } catch (err) {
@@ -406,7 +575,7 @@ export function useSession(name: string, active: boolean) {
       try {
         const shared = await client.sharedWith(event.peerId);
         const streamKey = await deriveStreamKey(shared, fromHex(item.streamId));
-        patchIncoming(item.requestId, { state: "receiving" });
+        patchIncoming(item.requestId, { state: "receiving", path: "relayed" });
         await startDownload({
           relayBase: RELAY_BASE,
           transferId: event.transferId,
@@ -421,6 +590,205 @@ export function useSession(name: string, active: boolean) {
       }
     },
     [patchIncoming, patchOutgoing, releasePeer],
+  );
+
+  /**
+   * Sends one approved transfer, direct if a connection is up and over
+   * the relay if not.
+   *
+   * The relay branch stops here: `transfer_ready` arrives separately and
+   * `handleTransferReady` owns the rest of it, including releasing the
+   * peer. The direct branch runs to completion inside this call.
+   */
+  const startSend = useCallback(
+    async (requestId: string) => {
+      const client = clientRef.current;
+      const item = outgoingRef.current.get(requestId);
+      if (!client || !item) return;
+
+      const link = linksRef.current?.peek(item.peerId);
+      const direct = link ? await link.waitOpen(DIRECT_WAIT_MS) : false;
+
+      if (!link || !direct) {
+        patchOutgoing(requestId, { path: "relayed" });
+        client.beginTransfer(item.peerId, cipherSizeFor(item.size));
+        return;
+      }
+
+      patchOutgoing(requestId, { path: "direct" });
+      try {
+        const shared = await client.sharedWith(item.peerId);
+        const streamKey = await importAesKey(
+          await deriveStreamKey(shared, item.streamId),
+        );
+
+        // The receiver's download has to exist before any bytes move: the
+        // port feeding it queues without limit, so this is the one hop
+        // backpressure could not otherwise reach.
+        const ready = new Promise<void>((resolve, reject) => {
+          readyWaiters.current.set(requestId, { resolve, reject });
+        });
+        link.sendControl({ t: "begin", requestId, size: item.size });
+        await withTimeout(
+          ready,
+          DIRECT_WAIT_MS,
+          "the other side never started the download",
+        );
+
+        await sendOverChannel({
+          channel: link,
+          source: item.openStream(),
+          streamKey,
+          onProgress: throttleProgress((sent) =>
+            patchOutgoing(requestId, { sentBytes: sent }),
+          ),
+        });
+        link.sendControl({ t: "end", requestId });
+        patchOutgoing(requestId, { state: "done" });
+      } catch (err) {
+        // Deliberately not retried over the relay. Splicing a
+        // half-delivered stream onto a second transport is how a file
+        // gets quietly corrupted rather than loudly failed.
+        patchOutgoing(requestId, { state: "failed", error: describe(err) });
+        try {
+          link.sendControl({ t: "abort", requestId, error: describe(err) });
+        } catch {
+          // The channel is what failed. Nothing left to tell.
+        }
+      } finally {
+        readyWaiters.current.delete(requestId);
+        releasePeer(item.peerId);
+      }
+    },
+    [patchOutgoing, releasePeer],
+  );
+
+  useEffect(() => {
+    beginSend.current = (requestId) => void startSend(requestId);
+  }, [startSend]);
+
+  /** Control messages from a peer's data channel. */
+  const handleChannelControl = useCallback(
+    async (peerId: string, message: ChannelControl) => {
+      const client = clientRef.current;
+      const link = linksRef.current?.peek(peerId);
+      if (!client || !link) return;
+
+      if (message.t === "ready") {
+        readyWaiters.current.get(message.requestId)?.resolve();
+        return;
+      }
+
+      if (message.t === "begin") {
+        const item = incomingRef.current.get(message.requestId);
+        // The consent rule is the same on both paths: bytes only move for
+        // an offer this person explicitly approved. A direct connection
+        // does not get to skip that.
+        if (!item || item.state !== "approved") {
+          link.sendControl({
+            t: "abort",
+            requestId: message.requestId,
+            error: "that transfer was not approved",
+          });
+          return;
+        }
+        try {
+          const shared = await client.sharedWith(peerId);
+          const streamKey = await deriveStreamKey(shared, fromHex(item.streamId));
+          const sink = await startDirectDownload({
+            transferId: item.requestId,
+            filename: item.name,
+            plaintextSize: item.size,
+            streamKey,
+          });
+          activeReceive.current.set(peerId, {
+            requestId: item.requestId,
+            sink,
+            received: 0,
+            report: throttleProgress((bytes) =>
+              patchIncoming(item.requestId, { receivedBytes: bytes }),
+            ),
+          });
+          patchIncoming(item.requestId, {
+            state: "receiving",
+            path: "direct",
+            receivedBytes: 0,
+          });
+          link.sendControl({ t: "ready", requestId: item.requestId });
+        } catch (err) {
+          patchIncoming(item.requestId, {
+            state: "failed",
+            error: describe(err),
+          });
+          link.sendControl({
+            t: "abort",
+            requestId: item.requestId,
+            error: describe(err),
+          });
+        }
+        return;
+      }
+
+      const active = activeReceive.current.get(peerId);
+      if (!active || active.requestId !== message.requestId) return;
+      activeReceive.current.delete(peerId);
+
+      if (message.t === "end") {
+        active.sink.close();
+        patchIncoming(message.requestId, { state: "done" });
+        return;
+      }
+      active.sink.abort(message.error);
+      patchIncoming(message.requestId, {
+        state: "failed",
+        error: message.error,
+      });
+    },
+    [patchIncoming],
+  );
+
+  /**
+   * Payload frames from a peer's data channel. Awaiting the write is what
+   * applies backpressure: the link handles messages one at a time, so a
+   * slow disk slows the reads, which fills the channel buffer, which
+   * pauses the sender.
+   */
+  const handleChannelData = useCallback(
+    async (peerId: string, bytes: Uint8Array) => {
+      const active = activeReceive.current.get(peerId);
+      if (!active) return;
+      try {
+        await active.sink.write(bytes);
+        active.received += bytes.length;
+        active.report(active.received);
+      } catch (err) {
+        activeReceive.current.delete(peerId);
+        active.sink.abort(describe(err));
+        patchIncoming(active.requestId, {
+          state: "failed",
+          error: describe(err),
+        });
+      }
+    },
+    [patchIncoming],
+  );
+
+  /** A dropped connection fails whatever was riding on it, both ways. */
+  const handleLinkClosed = useCallback(
+    (peerId: string) => {
+      const active = activeReceive.current.get(peerId);
+      if (active) {
+        activeReceive.current.delete(peerId);
+        const error = "the direct connection dropped";
+        active.sink.abort(error);
+        patchIncoming(active.requestId, { state: "failed", error });
+      }
+      for (const [requestId, waiter] of readyWaiters.current) {
+        if (outgoingRef.current.get(requestId)?.peerId !== peerId) continue;
+        waiter.reject(new Error("the direct connection dropped"));
+      }
+    },
+    [patchIncoming],
   );
 
   /** Sends a text message. No data plane: the text rides in the envelope. */
@@ -499,6 +867,10 @@ export function useSession(name: string, active: boolean) {
 
       // One group per payload, spanning its recipients.
       const groups = payloads.map(() => toHex(randomBytes(6)));
+
+      // Start connecting before anything is offered, so the negotiation
+      // overlaps with the time somebody spends deciding.
+      for (const to of targets) linksRef.current?.get(to).start();
 
       for (const to of targets) {
         for (const [index, payload] of payloads.entries()) {

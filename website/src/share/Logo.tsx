@@ -1,42 +1,51 @@
 /**
- * The mark: a geometric b on a solid tile.
+ * The mark: an isometric cube, drawn open.
  *
- * Drawn with filled shapes rather than strokes. The previous version
- * stroked a line and a circle that overlapped by 2.25px, so the join
- * between stem and bowl piled up two strokes and read as a smudge at
- * small sizes.
+ * From the approved comp, and kept as a hand-written component rather than
+ * an icon-library import so the brand mark stays under our own control.
  *
- * The geometry is deliberate and worth preserving if this is ever
- * adjusted:
- *
- *   - The glyph is centred in the tile. Stem and bowl together span
- *     x 6.8 to 17.3 and y 4.4 to 19.6, both centred on 12.
- *   - Stem and bowl share a baseline at y 19.6, so the letter sits flat
- *     rather than the bowl hanging below the stem.
- *   - The bowl's ring is 2.6 wide, the same as the stem, so the whole
- *     letter carries one weight. That single fact is most of what makes
- *     a constructed letterform look drawn rather than assembled.
- *
- * The counter is painted back in the tile colour rather than punched out
- * with a fill rule, which keeps the shapes independent and avoids the
- * winding-order artefacts an even-odd union produces where stem and bowl
- * overlap.
+ * The geometry is worth preserving if this is ever adjusted: one outer
+ * hexagon and three edges meeting at the centre. The three edges are what
+ * turn a flat hexagon into a solid, and they must terminate exactly at
+ * 12,12 — a gap of even half a unit at that junction reads as a drawing
+ * error rather than a corner. Stroked, not filled, so the accent colour
+ * carries it at any size without a second tone.
  */
-export function Logo({ size = 22, tone }: { size?: number; tone?: string }) {
-  const ink = tone ?? "var(--paper)";
+export function Logo({ size = 18, tone = "var(--bj-acc)" }: { size?: number; tone?: string }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={tone}
       aria-hidden="true"
       focusable="false"
+      className="bj-logo-mark"
     >
-      <rect width="24" height="24" rx="6.75" fill="currentColor" />
-      <rect x="6.8" y="4.4" width="2.6" height="15.2" rx="1.3" fill={ink} />
-      <circle cx="12.3" cy="14.6" r="5" fill={ink} />
-      <circle cx="12.3" cy="14.6" r="2.4" fill="currentColor" />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M5 3H13.5C16.5376 3 19 5.46243 19 8.5C19 10.3842 18.0535 12.0468 16.6186 13.0298C18.3184 14.0041 19.5 15.8643 19.5 18C19.5 21.0376 17.0376 23.5 14 23.5H5V3ZM9.5 7H13C13.8284 7 14.5 7.67157 14.5 8.5C14.5 9.32843 13.8284 10 13 10H9.5V7ZM9.5 14H13.5C14.3284 14 15 14.6716 15 15.5C15 16.3284 14.3284 17 13.5 17H9.5V14Z"
+      />
     </svg>
+  );
+}
+
+/** Mark plus wordmark, used in both mastheads and the footer. */
+export function Wordmark({
+  size = 18,
+  tag = "web",
+  className,
+}: {
+  size?: number;
+  tag?: string | null;
+  className?: string;
+}) {
+  return (
+    <span className={className ? `wordmark ${className}` : "wordmark"}>
+      <Logo size={size} />
+      <span className="wordmark-name">bonjou</span>
+      {tag ? <span className="wordmark-tag">{tag}</span> : null}
+    </span>
   );
 }
