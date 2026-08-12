@@ -1424,6 +1424,51 @@
   }
 }
 
+/*
+ * Touch pointers, not narrow windows.
+ *
+ * These controls are sized for a cursor, which is a few pixels wide; a
+ * fingertip is closer to forty. Keyed on the pointer rather than the
+ * viewport so a laptop at a small window size keeps the tighter set,
+ * and a tablet at a wide one still gets targets it can hit.
+ */
+@media (pointer: coarse) {
+  /* min-*, not width/height: these have to beat the fixed sizes above
+     without depending on which rule the cascade happens to reach last. */
+  .icon-btn,
+  .theme-toggle-btn,
+  .foot-icon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .btn-copy {
+    min-height: 38px;
+    padding: 9px 13px;
+  }
+
+  .install-tabs {
+    gap: 20px;
+  }
+
+  .install-tabs button {
+    min-height: 44px;
+    padding: 13px 2px;
+  }
+
+  .foot-col a,
+  .install-links a,
+  .linkish {
+    min-height: 36px;
+  }
+
+  .hero-actions > *,
+  .masthead .btn-solid,
+  .closer-btn {
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 660px) {
   .foot-grid {
     grid-template-columns: 1fr 1fr;

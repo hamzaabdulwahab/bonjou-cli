@@ -942,8 +942,15 @@
 /* Name gate                                                           */
 /* ------------------------------------------------------------------ */
 
+/*
+ * minmax(0, 1fr), not the default auto: an auto track takes its minimum
+ * from the widest item's min-content, and the name field's flex row
+ * reports its full intrinsic width there. On a phone that pushed the
+ * track to 416px inside a 390px viewport and the page scrolled sideways.
+ */
 .gate {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   height: 100dvh;
   background: var(--bj-bg);
@@ -1486,7 +1493,10 @@
 .palette-container {
   pointer-events: auto;
   width: min(520px, calc(100vw - 32px));
-  max-height: 60vh;
+  /* dvh: 60vh measures against the tallest the viewport ever gets, so on
+     a phone with a retracting toolbar the palette could run past the
+     bottom of what is actually on screen. */
+  max-height: 60dvh;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--bj-line);
@@ -1495,9 +1505,13 @@
   box-shadow: var(--bj-shadow-pop);
   overflow: hidden;
   animation: bj-rise 0.16s var(--bj-ease);
-  touch-action: none;
 }
 
+/*
+ * touch-action belongs on the handle, not the panel. On the panel it
+ * disabled panning for everything inside it, which on a touch screen
+ * meant the results list could not be scrolled at all.
+ */
 .palette-head {
   display: flex;
   align-items: center;
@@ -1506,6 +1520,7 @@
   border-bottom: 1px solid var(--bj-line-soft);
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 
 .palette-head:active {
@@ -1710,5 +1725,81 @@
   /* The offer is raised into the sheet instead. */
   .card.is-asking .card-actions {
     display: none;
+  }
+
+  /*
+   * 16px is the threshold below which iOS Safari zooms the viewport when
+   * a field takes focus, and it does not zoom back out afterwards. Every
+   * field here was under it, so tapping the composer left the whole app
+   * magnified and scrolled sideways. Desktop keeps its finer sizes.
+   */
+  .composer-box textarea,
+  .rail-search input,
+  .room-join input,
+  .field-row input,
+  .palette-head input {
+    font-size: 16px;
+  }
+
+  /* Dragging is off at this width, so the handle should not eat pans. */
+  .palette-head {
+    touch-action: auto;
+  }
+
+  /*
+   * Keep a flick at the end of the conversation inside the conversation.
+   * Without this the gesture chains to the page and rubber-bands the
+   * whole app, which is the clearest tell that this is a web page.
+   */
+  .thread-body,
+  .rail-list,
+  .side-body,
+  [cmdk-list] {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Sized for a fingertip rather than a cursor. See the matching block in
+   site.css for why this keys on the pointer and not the width. */
+@media (pointer: coarse) {
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .thread-tools .btn-tool {
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .attach {
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  .chip {
+    padding: 11px 9px;
+  }
+
+  .rail-me {
+    padding: 10px 9px;
+  }
+
+  [cmdk-item] {
+    padding: 11px 9px;
+  }
+
+  .card-actions button {
+    min-height: 38px;
+    padding: 8px 14px;
+  }
+
+  /* Approve and Decline are the two most consequential taps here. */
+  .sheet-actions button,
+  .modal-actions button,
+  .room-join button,
+  .segmented button {
+    min-height: 44px;
   }
 }

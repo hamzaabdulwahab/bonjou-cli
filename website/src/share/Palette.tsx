@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Command } from "cmdk";
 import {
   ArrowDownToLine,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import type { Peer } from "./relay";
+import { useMediaQuery } from "./theme";
 import { EVERYONE } from "./useSession";
 
 interface PaletteProps {
@@ -42,22 +43,42 @@ interface PaletteProps {
  */
 const POS_KEY = "bonjou:palette:pos";
 
-function getInitialPosition(): { x: number; y: number } | null {
+/** Kept clear of every edge by this much, dragged or restored. */
+const MARGIN = 10;
+
+/** How far a press travels before it counts as a drag and not a click. */
+const DRAG_SLOP = 4;
+
+/**
+ * Hold a position inside the viewport.
+ *
+ * Against the palette's own box, not a fixed inset: clamping x to
+ * `innerWidth - 100` let a position saved on a laptop put a 358px palette
+ * at x=290 on a 390px phone, leaving a tenth of it on screen.
+ */
+function clampToViewport(
+  pos: { x: number; y: number },
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const maxX = Math.max(MARGIN, window.innerWidth - width - MARGIN);
+  const maxY = Math.max(MARGIN, window.innerHeight - height - MARGIN);
+  return {
+    x: Math.min(Math.max(MARGIN, pos.x), maxX),
+    y: Math.min(Math.max(MARGIN, pos.y), maxY),
+  };
+}
+
+function storedPosition(): { x: number; y: number } | null {
   try {
     const stored = localStorage.getItem(POS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (typeof parsed.x === "number" && typeof parsed.y === "number") {
-        const maxX = Math.max(10, window.innerWidth - 100);
-        const maxY = Math.max(10, window.innerHeight - 100);
-        return {
-          x: Math.min(Math.max(10, parsed.x), maxX),
-          y: Math.min(Math.max(10, parsed.y), maxY),
-        };
-      }
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+      return { x: parsed.x, y: parsed.y };
     }
   } catch {
-    // Ignore parse errors
+    // Unparseable or storage refused. Fall back to centred.
   }
   return null;
 }
@@ -79,62 +100,105 @@ export function Palette(props: PaletteProps) {
     onTransfers,
   } = props;
 
+  // A phone gets a centred sheet, never a dragged one: there is no room
+  // to move it to, and a stored laptop position is meaningless here.
+  const narrow = useMediaQuery("(max-width: 860px)");
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
   const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pressOrigin = useRef<{ x: number; y: number } | null>(null);
+  const pressedBackdrop = useRef(false);
   const shellRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  // Layout, not effect: the correction lands before the frame paints, so
+  // a restored position never flashes in the wrong place.
+  useLayoutEffect(() => {
     if (!open) return;
-    const stored = getInitialPosition();
-    if (stored) {
-      setPosition(stored);
-    } else {
-      const width = Math.min(520, window.innerWidth - 32);
-      const height = 360;
-      const x = Math.max(16, (window.innerWidth - width) / 2);
-      const y = Math.max(16, (window.innerHeight - height) / 2);
-      setPosition({ x, y });
-    }
-  }, [open]);
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (!shellRef.current) return;
-    const target = e.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "BUTTON" || target.closest("button")) {
+    if (narrow) {
+      setPosition(null);
       return;
     }
-
-    isDragging.current = true;
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      // Ignore
+    const stored = storedPosition();
+    if (!stored) {
+      setPosition(null);
+      return;
     }
+    const el = shellRef.current;
+    setPosition(
+      clampToViewport(stored, el?.offsetWidth ?? 520, el?.offsetHeight ?? 360),
+    );
+  }, [open, narrow]);
+
+  // Rotating a phone or dragging a window smaller must not strand it
+  // half off the screen.
+  useEffect(() => {
+    if (!open) return;
+    const onResize = () => {
+      const el = shellRef.current;
+      if (!el) return;
+      setPosition((current) =>
+        current
+          ? clampToViewport(current, el.offsetWidth, el.offsetHeight)
+          : current,
+      );
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open]);
+
+  /*
+   * The field fills the header, so refusing to drag from it left a 37px
+   * strip beside the icon as the only handle. Spotlight drags from the
+   * whole bar and still takes a caret on a plain click, and the way to
+   * have both is to wait for the pointer to travel: under the threshold
+   * the press is a click, past it the press becomes a drag.
+   */
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (narrow || !shellRef.current) return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === "BUTTON" || target.closest("button")) return;
 
     const rect = shellRef.current.getBoundingClientRect();
-    dragOffset.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    pressOrigin.current = { x: e.clientX, y: e.clientY };
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging.current || !shellRef.current) return;
+    const origin = pressOrigin.current;
+    if (!origin || !shellRef.current) return;
 
-    const width = shellRef.current.offsetWidth;
-    const height = shellRef.current.offsetHeight;
+    if (!isDragging.current) {
+      if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < DRAG_SLOP) {
+        return;
+      }
+      isDragging.current = true;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // Capture is an optimisation here, not a requirement.
+      }
+      // A press that began in the field started selecting text on its way
+      // out of the slop radius. Drop it rather than drag a highlight.
+      document.getSelection()?.removeAllRanges();
+    }
 
-    const newX = Math.min(Math.max(10, e.clientX - dragOffset.current.x), window.innerWidth - width - 10);
-    const newY = Math.min(Math.max(10, e.clientY - dragOffset.current.y), window.innerHeight - height - 10);
-
-    const newPos = { x: newX, y: newY };
-    setPosition(newPos);
+    setPosition(
+      clampToViewport(
+        {
+          x: e.clientX - dragOffset.current.x,
+          y: e.clientY - dragOffset.current.y,
+        },
+        shellRef.current.offsetWidth,
+        shellRef.current.offsetHeight,
+      ),
+    );
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    pressOrigin.current = null;
     if (!isDragging.current) return;
     isDragging.current = false;
+    document.getSelection()?.removeAllRanges();
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {
@@ -150,7 +214,21 @@ export function Palette(props: PaletteProps) {
     }
   };
 
+  /*
+   * Dismiss on a click that both began and ended on the backdrop.
+   *
+   * A click's target is the common ancestor of where the press went down
+   * and where it came up, so a drag that ended past the palette's edge
+   * reported the backdrop and closed the thing being dragged.
+   */
+  const handleBackdropPointerDown = (e: React.PointerEvent) => {
+    pressedBackdrop.current = e.target === e.currentTarget;
+  };
+
   const handleOverlayClick = (e: React.MouseEvent) => {
+    const startedOutside = pressedBackdrop.current;
+    pressedBackdrop.current = false;
+    if (!startedOutside || isDragging.current) return;
     if (shellRef.current && !shellRef.current.contains(e.target as Node)) {
       onOpenChange(false);
     }
@@ -184,7 +262,11 @@ export function Palette(props: PaletteProps) {
       overlayClassName="scrim"
       contentClassName="palette-shell"
     >
-      <div className="palette-backdrop" onClick={handleOverlayClick}>
+      <div
+        className="palette-backdrop"
+        onPointerDown={handleBackdropPointerDown}
+        onClick={handleOverlayClick}
+      >
         <div
           ref={shellRef}
           className="palette-container"

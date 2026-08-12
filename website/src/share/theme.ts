@@ -38,6 +38,58 @@ export function resolve(choice: ThemeChoice): ResolvedTheme {
 /** Applied from the document head too, before the first paint. */
 export function apply(theme: ResolvedTheme): void {
   document.documentElement.dataset.theme = theme;
+  paintBrowserChrome();
+}
+
+/**
+ * The tokens are OKLCH, and theme-color is read by a parser older and
+ * narrower than the CSS engine beside it. A canvas round-trip lands on
+ * plain hex without a second copy of the colour to keep in step.
+ */
+function toHexColour(value: string): string {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return value;
+    ctx.fillStyle = value;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * Hand the current background to the browser's own chrome.
+ *
+ * The two theme-color tags in the head only answer the operating system's
+ * preference, so a manual choice left Safari's toolbar and Android's
+ * status bar showing the other theme — a light strip above a dark app is
+ * the most obvious way a web page announces it is a web page. Read back
+ * from --bj-bg so there is still one place the colour is decided.
+ */
+function paintBrowserChrome(): void {
+  const token = getComputedStyle(document.documentElement)
+    .getPropertyValue("--bj-bg")
+    .trim();
+  if (!token) return;
+  const colour = toHexColour(token);
+
+  // Every one of them, including the media-scoped pair in the head: the
+  // browser takes the first tag whose media matches, so writing only an
+  // appended unscoped tag would be overruled by the pair above it.
+  const tags = document.querySelectorAll('meta[name="theme-color"]');
+  if (tags.length === 0) {
+    const tag = document.createElement("meta");
+    tag.setAttribute("name", "theme-color");
+    tag.setAttribute("content", colour);
+    document.head.appendChild(tag);
+    return;
+  }
+  for (const tag of tags) tag.setAttribute("content", colour);
 }
 
 /**

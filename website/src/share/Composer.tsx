@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, FolderClosed, Paperclip } from "lucide-react";
 
 import { fromDataTransfer } from "./dropped";
@@ -29,12 +29,36 @@ export function Composer({
 
   const canSend = targets.length > 0;
 
-  useEffect(() => {
+  const fit = useCallback(() => {
     const el = areaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_ROWS_PX)}px`;
-  }, [draft]);
+    const wanted = Math.min(el.scrollHeight, MAX_ROWS_PX);
+    // An element inside a display:none subtree measures zero, and the
+    // narrow layout hides the stage while the rail is up. Writing that
+    // zero back would pin the field shut at its padding until the first
+    // keystroke, which is exactly what it used to do on a phone.
+    if (wanted === 0) return;
+    el.style.height = `${wanted}px`;
+  }, []);
+
+  useEffect(fit, [draft, fit]);
+
+  // Re-measure the first time it actually has a box. Only the
+  // hidden-to-visible edge triggers this, so the writes above cannot
+  // feed back into the observer.
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let hadBox = el.offsetWidth > 0;
+    const observer = new ResizeObserver(() => {
+      const hasBox = el.offsetWidth > 0;
+      if (hasBox && !hadBox) fit();
+      hadBox = hasBox;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fit]);
 
   const send = () => {
     if (!canSend || !draft.trim()) return;

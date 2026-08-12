@@ -563,7 +563,7 @@ export function Landing({
 
         <div className="foot-bottom">
           <span className="foot-copy">
-            © {new Date().getFullYear()} Bonjou. Released under the MIT License.
+            No cookies, no analytics, no account.
           </span>
           <span className="spacer" />
           <span className={live ? "foot-relay is-live" : "foot-relay"}>
