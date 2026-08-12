@@ -239,16 +239,16 @@ export function Landing({
             </p>
             <div className="relay-box">
               <div className="relay-box-head">
-                <Lock size={12} strokeWidth={2} aria-hidden="true" />
+                <Lock size={12} strokeWidth={1.75} aria-hidden="true" />
                 <span>RELAY METADATA VISIBILITY</span>
               </div>
               <div className="relay-box-list">
                 <div className="relay-item is-visible">
-                  <Check size={13} strokeWidth={2} aria-hidden="true" />
+                  <Check size={13} strokeWidth={1.75} aria-hidden="true" />
                   <span>Destination peer ID</span>
                 </div>
                 <div className="relay-item is-visible">
-                  <Check size={13} strokeWidth={2} aria-hidden="true" />
+                  <Check size={13} strokeWidth={1.75} aria-hidden="true" />
                   <span>Encrypted payload byte count</span>
                 </div>
                 <div className="relay-item is-hidden">
@@ -456,7 +456,7 @@ export function Landing({
               onClick={onOpenApp}
             >
               Open bonjou web
-              <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
+              <ArrowRight size={15} strokeWidth={1.75} aria-hidden="true" />
             </button>
           </div>
         </section>

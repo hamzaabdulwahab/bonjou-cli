@@ -144,7 +144,7 @@ export function Rail(props: RailProps) {
             <Search size={12} strokeWidth={1.75} aria-hidden="true" />
           ) : isMac ? (
             <>
-              <CommandIcon size={11} strokeWidth={2} aria-hidden="true" />
+              <CommandIcon size={11} strokeWidth={1.75} aria-hidden="true" />
               <span>K</span>
             </>
           ) : (

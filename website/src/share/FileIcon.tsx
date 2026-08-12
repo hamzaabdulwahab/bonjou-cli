@@ -1,19 +1,13 @@
-import {
-  File,
-  FileArchive,
-  FileAudio,
-  FileCode,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FileVideo,
-  Folder,
-  FolderOpen,
-} from "lucide-react";
-import { BY_EXTENSION, BY_NAME } from "./fileIconMap";
+import { BY_EXTENSION, BY_NAME, ICONS } from "./fileIconMap";
 
 /**
- * The icon for a payload, chosen from its name using Lucide React icons.
+ * The icon for a payload, chosen from its name.
+ *
+ * Resolution follows the Material Icon Theme's own order, which is what
+ * makes a filename here look the way it looks in an editor: an exact
+ * filename beats an extension, so `package.json` is a Node icon rather
+ * than a JSON one, and the longest suffix wins, so `archive.tar.gz` reads
+ * as an archive rather than as a `.gz`.
  */
 function resolve(fileName: string): string {
   const lower = fileName.toLowerCase().replace(/\/+$/, "");
@@ -43,6 +37,15 @@ interface FileIconProps {
   className?: string;
 }
 
+/**
+ * Polychrome on purpose.
+ *
+ * A transfer list is a column of filenames, and colour is the fastest way
+ * to find the one you want while scrolling past it. The markup is the
+ * theme's own SVG, injected rather than rebuilt as JSX: these are 68
+ * build-time constants from a package, never anything a peer sent, and
+ * hand-porting them would mean maintaining a fork of an icon set.
+ */
 export function FileIcon({
   name = "",
   folder = false,
@@ -50,56 +53,17 @@ export function FileIcon({
   size = 16,
   className,
 }: FileIconProps) {
-  if (folder) {
-    return open ? (
-      <FolderOpen size={size} className={className} strokeWidth={1.75} aria-hidden="true" />
-    ) : (
-      <Folder size={size} className={className} strokeWidth={1.75} aria-hidden="true" />
-    );
-  }
+  const icon = folder ? (open ? "folder-open" : "folder") : resolve(name);
+  const svg = ICONS[icon] ?? ICONS.file;
 
-  const type = resolve(name);
-
-  if (["image", "photo"].includes(type)) {
-    return <FileImage size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-  if (["video", "movie"].includes(type)) {
-    return <FileVideo size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-  if (["audio", "music", "sound"].includes(type)) {
-    return <FileAudio size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-  if (["zip", "archive", "tar"].includes(type)) {
-    return <FileArchive size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-  if (
-    [
-      "python",
-      "javascript",
-      "typescript",
-      "go",
-      "code",
-      "html",
-      "css",
-      "json",
-      "markdown",
-      "git",
-      "docker",
-      "makefile",
-      "nodejs",
-      "react",
-    ].includes(type)
-  ) {
-    return <FileCode size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-  if (["table", "spreadsheet", "excel"].includes(type)) {
-    return <FileSpreadsheet size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-  if (["pdf", "document", "text"].includes(type)) {
-    return <FileText size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
-  }
-
-  return <File size={size} className={className} strokeWidth={1.75} aria-hidden="true" />;
+  return (
+    <span
+      className={className ? `file-icon ${className}` : "file-icon"}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
 }
 
 /** Exposed for tests: which icon a name resolves to. */

@@ -7,6 +7,9 @@ describe("file icon resolution", () => {
     expect(iconNameFor("model.py")).toBe("python");
     expect(iconNameFor("invoice.pdf")).toBe("pdf");
     expect(iconNameFor("bundle.js")).toBe("javascript");
+    // The theme gives .tsx its own icon rather than reusing React's.
+    expect(iconNameFor("Palette.tsx")).toBe("react_ts");
+    expect(iconNameFor("relay.ts")).toBe("typescript");
     expect(iconNameFor("main.go")).toBe("go");
     expect(iconNameFor("notes.md")).toBe("markdown");
   });

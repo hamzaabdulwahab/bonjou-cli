@@ -27,11 +27,14 @@ const CURATED = [
   // Fallbacks and folders
   "file", "folder", "folder-open",
   // Code
-  "javascript", "typescript", "react", "python", "go", "rust", "java",
-  "c", "cpp", "csharp", "php", "ruby", "swift", "kotlin", "console",
+  // "react_ts" is the one the theme gives .tsx; without it every .tsx
+  // fell through to the generic file, which on a tool developers send
+  // source to is the wrong file to get wrong.
+  "javascript", "typescript", "react", "react_ts", "python", "go", "rust",
+  "java", "c", "cpp", "csharp", "php", "ruby", "swift", "kotlin", "console",
   "html", "css", "sass", "json", "yaml", "xml", "markdown", "toml",
   "jupyter", "lua", "perl", "r", "dart", "scala", "haskell", "elixir",
-  "vue", "svelte",
+  "vue", "svelte", "astro",
   // Documents and data
   "pdf", "word", "powerpoint", "table", "document", "database", "log",
   "epub",
