@@ -1025,6 +1025,17 @@
   font-size: 14px;
 }
 
+/*
+ * A row that holds only a button. Not .gate-field: that one stretches its
+ * children to match an input beside them, and with no input there the
+ * button collapsed to the height of its own label.
+ */
+.gate-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .gate-note {
   margin-top: 20px;
   max-width: 44ch;

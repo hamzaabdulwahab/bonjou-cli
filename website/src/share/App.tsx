@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
 
 import { Landing } from "./Landing";
+import { TabTaken } from "./TabTaken";
 import { Workspace } from "./Workspace";
+import { useSessionOwnership } from "./tabs";
 import { useTheme } from "./theme";
 import { useSession } from "./useSession";
 
@@ -40,7 +42,11 @@ export default function App() {
   const [name, setName] = useState(storedName);
   const [view, setView] = useState<View>(viewFromLocation);
   const theme = useTheme();
-  const session = useSession(name, Boolean(name));
+  // One connection per browser. A tab that does not hold the lock never
+  // opens a session, so it never becomes a second entry in anyone's list.
+  const ownership = useSessionOwnership();
+  const owns = ownership.state === "owner";
+  const session = useSession(name, Boolean(name) && owns);
 
   const commitName = useCallback((value: string) => {
     try {
@@ -76,6 +82,21 @@ export default function App() {
     toast(notice);
     setNotice("");
   }, [notice, setNotice]);
+
+  // Only the workspace is a presence. The marketing page reads a roster
+  // it does not join, so a blocked tab can still show it.
+  if (view === "app" && !owns) {
+    return (
+      <>
+        <TabTaken onTakeOver={ownership.takeOver} />
+        <Toaster
+          position="bottom-center"
+          theme={theme.resolved}
+          toastOptions={{ className: "bj-toast" }}
+        />
+      </>
+    );
+  }
 
   return (
     <>

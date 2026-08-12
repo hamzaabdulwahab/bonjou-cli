@@ -21,6 +21,7 @@ import {
   type KeyPair,
 } from "./crypto";
 import { RelayClient, describe, type ConnectionStatus, type Peer } from "./relay";
+import { useSiblingTabs } from "./tabs";
 import {
   cipherSizeFor,
   registerServiceWorker,
@@ -229,6 +230,17 @@ export function useSession(name: string, active: boolean) {
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [code, setCode] = useState("");
   const [peers, setPeers] = useState<Peer[]>([]);
+  // This tab's own relay id, and the ids of this browser's other tabs.
+  // The relay cannot tell those apart from other people on the same
+  // address, so they are filtered here rather than there. See tabs.ts.
+  const [selfPeerId, setSelfPeerId] = useState("");
+  const siblingTabs = useSiblingTabs(selfPeerId);
+  const siblingTabsRef = useRef(siblingTabs);
+  siblingTabsRef.current = siblingTabs;
+  // The roster exactly as the relay sent it, kept so the visible list can
+  // be recomputed when a sibling tab opens or closes without waiting for
+  // the relay to send a fresh one.
+  const rosterRef = useRef<Peer[]>([]);
   const [fingerprints, setFingerprints] = useState<Record<string, string>>({});
   const [outgoing, setOutgoing] = useState<OutgoingItem[]>([]);
   const [incoming, setIncoming] = useState<IncomingItem[]>([]);
@@ -316,6 +328,39 @@ export function useSession(name: string, active: boolean) {
     [pumpQueue],
   );
 
+  /**
+   * Turn the relay's roster into the list of actual other people.
+   *
+   * Runs both when a roster arrives and when the set of sibling tabs
+   * changes, because opening a second tab has to remove a name from the
+   * first tab's list without the relay having anything new to say.
+   */
+  const applyRoster = useCallback(() => {
+    const visible = rosterRef.current.filter(
+      (peer) => !siblingTabsRef.current.has(peer.id),
+    );
+    setPeers(visible);
+    // A peer that left and came back has a new id and new keys, so its
+    // old connection is worthless and must be renegotiated. Sibling tabs
+    // are excluded here too: there is no reason to negotiate a direct
+    // connection with another tab of this same browser.
+    linksRef.current?.retain(visible.map((peer) => peer.id));
+    void (async () => {
+      const next: Record<string, string> = {};
+      for (const peer of visible) {
+        next[peer.id] = await sessionFingerprint(
+          identity.publicKey,
+          fromHex(peer.pubkey),
+        );
+      }
+      setFingerprints(next);
+    })();
+  }, [identity]);
+
+  useEffect(() => {
+    applyRoster();
+  }, [siblingTabs, applyRoster]);
+
   useEffect(() => {
     if (!active || !name) return;
 
@@ -365,6 +410,7 @@ export function useSession(name: string, active: boolean) {
           break;
 
         case "created":
+          setSelfPeerId(event.peerId);
           setCode(event.code);
           // Entering a room resolves whatever the last complaint was,
           // most often a failed join of an expired code. Leaving it up
@@ -374,6 +420,7 @@ export function useSession(name: string, active: boolean) {
           break;
 
         case "joined":
+          setSelfPeerId(event.peerId);
           if (event.code) {
             setCode(event.code);
             setNotice("");
@@ -382,20 +429,8 @@ export function useSession(name: string, active: boolean) {
           break;
 
         case "roster": {
-          setPeers(event.peers);
-          // A peer that left and came back has a new id and new keys, so
-          // its old connection is worthless and must be renegotiated.
-          linksRef.current?.retain(event.peers.map((peer) => peer.id));
-          void (async () => {
-            const next: Record<string, string> = {};
-            for (const peer of event.peers) {
-              next[peer.id] = await sessionFingerprint(
-                identity.publicKey,
-                fromHex(peer.pubkey),
-              );
-            }
-            setFingerprints(next);
-          })();
+          rosterRef.current = event.peers;
+          applyRoster();
           break;
         }
 
