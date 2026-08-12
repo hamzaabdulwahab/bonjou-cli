@@ -331,8 +331,15 @@ func (u *UI) writeLine(line string) {
 	// once the alt screen exits. Buffer the event instead — the on-exit
 	// hook (registered in New) flushes it back to the main scrollback so
 	// the user sees notifications produced during their wizard session.
+	//
+	// The buffer is the record; WizardNotify is the peek. Without the
+	// second call an incoming message stayed invisible until the wizard
+	// closed, so somebody filling in a form had no idea they had been
+	// spoken to. The alt screen is discarded on exit, which is why the
+	// line is still buffered for the scrollback rather than only shown.
 	if commands.WizardRenderActive() {
 		u.bufferWizardLine(line)
+		commands.WizardNotify(line)
 		return
 	}
 	u.emitLine(line)
@@ -396,6 +403,17 @@ func (u *UI) updateProgressLine(id, line string) {
 	u.progressLine = line
 	u.progressMu.Unlock()
 
+	// A progress tick is a carriage return and an erase, straight to the
+	// terminal, several times a second. Sent while the wizard owns the alt
+	// screen it lands in the middle of bubbletea's canvas and shreds it.
+	// The state above is still updated, so the bar resumes correctly once
+	// the wizard closes; only the drawing is withheld. Ticks are dropped
+	// rather than buffered because replaying a thousand of them on exit
+	// would bury the events worth reading.
+	if commands.WizardRenderActive() {
+		return
+	}
+
 	if u.rl == nil {
 		fmt.Printf("\r\033[J%s", line)
 		return
@@ -423,6 +441,14 @@ func (u *UI) finishProgressLine(id, line string) {
 		u.progressID = ""
 	}
 	u.progressMu.Unlock()
+
+	// The completed line is the one worth keeping, unlike the ticks that
+	// led to it, so it goes through writeLine and gets both the wizard's
+	// notice block and the buffer that replays into the scrollback.
+	if commands.WizardRenderActive() {
+		u.writeLine(line)
+		return
+	}
 
 	if u.rl == nil {
 		fmt.Printf("\r\033[J%s\n", line)

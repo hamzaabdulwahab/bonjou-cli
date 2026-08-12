@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -35,7 +36,30 @@ var (
 	wizardActiveMu    sync.Mutex
 	wizardExitHooks   []func()
 	wizardExitHooksMu sync.Mutex
+
+	// The bubbletea program currently drawing a wizard form, if any, and
+	// the notices waiting to be drawn under it. Both are package level
+	// because the wizard is a sequence of short-lived programs rather than
+	// one long-running model: a notice that arrives during the recipient
+	// step has to survive into the confirm step, or it flashes past on a
+	// form the user is about to leave.
+	wizardProg     *tea.Program
+	wizardProgMu   sync.Mutex
+	wizardNotices  []wizardNotice
+	wizardNoticeMu sync.Mutex
 )
+
+// wizardNotice is one line that arrived while the wizard owned the screen.
+type wizardNotice struct {
+	at   time.Time
+	text string
+}
+
+// ansiPattern matches the SGR sequences the UI colours its event lines
+// with. They are stripped before a line is drawn inside the alt screen:
+// lipgloss measures a string to lay out the box around it, and raw escape
+// bytes inflate that measurement into a broken frame.
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 const wizardBackValue = "__wizard_back__"
 
@@ -61,6 +85,11 @@ const (
 	// wizard layout. Kept as a constant so peer-label rendering is stable
 	// across terminal sizes.
 	wizardLabelWidth = 28
+
+	// How many arrived-during-the-wizard lines stay on screen. Three is
+	// enough to notice a conversation starting without the notice block
+	// pushing the form itself off a short terminal.
+	wizardNoticeCap = 3
 )
 
 // RegisterWizardExitHook arranges for fn to be invoked every time the
@@ -105,12 +134,73 @@ func setWizardActive(active bool) {
 	}
 }
 
+// WizardNotify shows a line on the wizard's screen as it arrives.
+//
+// The UI calls this alongside its buffering: the buffer is the record and
+// is replayed into the scrollback on exit, this is the peek that tells
+// somebody mid-form that a message just came in. Safe from any goroutine,
+// and a no-op when no wizard is on screen.
+func WizardNotify(line string) {
+	text := strings.TrimSpace(ansiPattern.ReplaceAllString(line, ""))
+	if text == "" {
+		return
+	}
+
+	wizardNoticeMu.Lock()
+	wizardNotices = append(wizardNotices, wizardNotice{at: time.Now(), text: text})
+	if len(wizardNotices) > wizardNoticeCap {
+		wizardNotices = wizardNotices[len(wizardNotices)-wizardNoticeCap:]
+	}
+	wizardNoticeMu.Unlock()
+
+	wizardProgMu.Lock()
+	prog := wizardProg
+	wizardProgMu.Unlock()
+	if prog == nil {
+		// Between two forms. The notice is already stored, so the next
+		// form draws it as soon as it starts.
+		return
+	}
+	// Send is safe once the program has finished; it gives up rather than
+	// blocking, which is what makes this callable from the event goroutine
+	// without coordinating on the wizard's lifetime.
+	prog.Send(wizardNoticeMsg{})
+}
+
+func recentWizardNotices() []wizardNotice {
+	wizardNoticeMu.Lock()
+	defer wizardNoticeMu.Unlock()
+	if len(wizardNotices) == 0 {
+		return nil
+	}
+	out := make([]wizardNotice, len(wizardNotices))
+	copy(out, wizardNotices)
+	return out
+}
+
+func clearWizardNotices() {
+	wizardNoticeMu.Lock()
+	wizardNotices = nil
+	wizardNoticeMu.Unlock()
+}
+
+// wizardNoticeMsg asks the running form to repaint. It carries nothing:
+// the notices themselves live in the package ring so a form that started
+// after they arrived still shows them.
+type wizardNoticeMsg struct{}
+
 // cmdWizard is the entry point for `@wizard`. It loops until the user
 // either exits cleanly or aborts the form. Between iterations a status
 // message can be carried forward into the menu's description so the user
 // sees the outcome of the previous action without it being lost when the
 // alt screen flashes away and back.
 func (h *Handler) cmdWizard() (Result, error) {
+	// Each wizard session starts with a clean notice block. Carrying the
+	// last session's lines into this one would present old traffic as if
+	// it had just arrived.
+	clearWizardNotices()
+	defer clearWizardNotices()
+
 	status := ""
 	for {
 		action := ""
@@ -243,7 +333,7 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 		if err := h.session.Transfer.SendMessage(peer, message); err != nil {
 			return wizardStatusError(fmt.Sprintf("Failed to send message to %s: %v", peerLabel(peer), err)), nil
 		}
-		return "", nil
+		return wizardStatusNotice(fmt.Sprintf("✓ Message sent to %s.", peerLabel(peer))), nil
 	case "file":
 		path, err := wizardPathInput("File path", "~/Downloads/example.txt", false)
 		if err != nil {
@@ -268,9 +358,13 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 		if err := h.session.Transfer.SendFile(peer, path); err != nil {
 			return wizardStatusError(fmt.Sprintf("Could not send %s: %v", filepath.Base(path), err)), nil
 		}
-		// Success is deliberately quiet: the transfer emits its own
-		// progress and delivery events.
-		return "", nil
+		// An offer, not a delivery. Saying "sent" here would be a lie for
+		// as long as the other side has not accepted, and the wait is
+		// exactly when somebody wonders whether the wizard did anything.
+		return wizardStatusNotice(fmt.Sprintf(
+			"✓ Offered %s to %s. Waiting for them to accept.",
+			filepath.Base(path), peerLabel(peer),
+		)), nil
 	case "folder":
 		path, err := wizardPathInput("Folder path", "~/Downloads/my-folder", true)
 		if err != nil {
@@ -295,7 +389,10 @@ func (h *Handler) wizardSendSingle(kind string) (string, error) {
 		if err := h.session.Transfer.SendFolder(peer, path); err != nil {
 			return wizardStatusError(fmt.Sprintf("Could not send %s: %v", filepath.Base(path), err)), nil
 		}
-		return "", nil
+		return wizardStatusNotice(fmt.Sprintf(
+			"✓ Offered folder %s to %s. Waiting for them to accept.",
+			filepath.Base(path), peerLabel(peer),
+		)), nil
 	default:
 		return "", fmt.Errorf("unsupported single wizard kind: %s", kind)
 	}
@@ -387,9 +484,28 @@ func (h *Handler) wizardSendMulti() (string, error) {
 			if len(errs) > 0 {
 				return wizardStatusError(fmt.Sprintf("Completed %d transfers, %d errors: %s", success, len(errs), strings.Join(errs, " | "))), nil
 			}
-			return "", nil
+			return wizardStatusNotice(wizardMultiSentNotice(transferKind, path, success)), nil
 		}
 	}
+}
+
+// wizardMultiSentNotice phrases the outcome of a fan-out. A message is
+// delivered; a file or folder is only offered until each recipient
+// accepts, and the notice says so rather than claiming more than happened.
+func wizardMultiSentNotice(transferKind, path string, recipients int) string {
+	people := "recipient"
+	if recipients != 1 {
+		people = "recipients"
+	}
+	if transferKind == "message" {
+		return fmt.Sprintf("✓ Message sent to %d %s.", recipients, people)
+	}
+	noun := "File"
+	if transferKind == "folder" {
+		noun = "Folder"
+	}
+	return fmt.Sprintf("✓ %s %s offered to %d %s. Waiting for them to accept.",
+		noun, filepath.Base(path), recipients, people)
 }
 
 func (h *Handler) wizardSendBroadcast() (string, error) {
@@ -722,7 +838,7 @@ func runWizardFormWithWidth(form *huh.Form, width int) error {
 	// text, and box frames in the alt-screen buffer when the new render is
 	// smaller or laid out differently — that's the artifact pattern visible
 	// when zooming. Issuing ClearScreen first guarantees a clean canvas.
-	wrapper := &altScreenClearModel{inner: form}
+	wrapper := &altScreenClearModel{inner: form, width: width}
 
 	prog := tea.NewProgram(wrapper,
 		tea.WithOutput(os.Stderr),
@@ -730,6 +846,19 @@ func runWizardFormWithWidth(form *huh.Form, width int) error {
 		tea.WithFilter(wizardTeaFilter),
 		tea.WithReportFocus(),
 	)
+
+	// Publish the program so WizardNotify can reach it, and take it back
+	// down before Run returns so a late notice cannot be sent into a
+	// program that is already tearing the alt screen down.
+	wizardProgMu.Lock()
+	wizardProg = prog
+	wizardProgMu.Unlock()
+	defer func() {
+		wizardProgMu.Lock()
+		wizardProg = nil
+		wizardProgMu.Unlock()
+	}()
+
 	finalModel, err := prog.Run()
 	if errors.Is(err, tea.ErrInterrupted) {
 		return huh.ErrUserAborted
@@ -747,9 +876,11 @@ func runWizardFormWithWidth(form *huh.Form, width int) error {
 
 // altScreenClearModel wraps a tea.Model and dispatches tea.ClearScreen on
 // every WindowSizeMsg so the alt screen is wiped before the new render.
-// See runWizardFormWithWidth for the rationale.
+// See runWizardFormWithWidth for the rationale. It also draws the notice
+// block for anything that arrived while the wizard has been on screen.
 type altScreenClearModel struct {
 	inner tea.Model
+	width int
 }
 
 func (a *altScreenClearModel) Init() tea.Cmd {
@@ -757,16 +888,69 @@ func (a *altScreenClearModel) Init() tea.Cmd {
 }
 
 func (a *altScreenClearModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// A notice is a repaint trigger and nothing else. Passing it to the
+	// form would be handing huh a message type it has no case for, and the
+	// text it should draw is not in the message anyway.
+	if _, ok := msg.(wizardNoticeMsg); ok {
+		return a, nil
+	}
+
 	next, cmd := a.inner.Update(msg)
 	a.inner = next
-	if _, ok := msg.(tea.WindowSizeMsg); ok {
+	if size, ok := msg.(tea.WindowSizeMsg); ok {
+		a.width = wizardRenderWidthFor(size.Width, wizardMenuMinWidth)
 		return a, tea.Batch(tea.ClearScreen, cmd)
 	}
 	return a, cmd
 }
 
 func (a *altScreenClearModel) View() string {
-	return a.inner.View()
+	view := a.inner.View()
+	notices := recentWizardNotices()
+	if len(notices) == 0 {
+		return view
+	}
+	return view + "\n" + wizardNoticeBlock(notices, a.width)
+}
+
+// wizardNoticeBlock renders arrived-while-you-were-here lines beneath the
+// form. Below and not above: a block that grows at the top would shove the
+// form down by a row every time somebody spoke, and moving a selection
+// list under the cursor is how a wizard sends a message to the wrong
+// person.
+func wizardNoticeBlock(notices []wizardNotice, width int) string {
+	if width < wizardMenuMinWidth {
+		width = wizardMenuMinWidth
+	}
+
+	heading := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#FF2D96", Dark: "#FF4DA6"}).
+		Bold(true).
+		Render("While you were here")
+
+	stamp := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#6B7280", Dark: "#9CA3AF"})
+	body := lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#111827", Dark: "#E5E7EB"})
+
+	lines := make([]string, 0, len(notices)+1)
+	lines = append(lines, heading)
+	for _, notice := range notices {
+		// The UI already stamps its event lines with a time, so a second
+		// one would read as a duplicate. Only bare lines get one.
+		text := notice.text
+		if !strings.HasPrefix(text, "[") {
+			text = stamp.Render(notice.at.Format("[15:04:05]")) + " " + body.Render(text)
+		} else {
+			text = body.Render(text)
+		}
+		lines = append(lines, text)
+	}
+
+	return lipgloss.NewStyle().
+		Width(width).
+		MarginTop(1).
+		Render(strings.Join(lines, "\n"))
 }
 
 // wizardMenuRenderWidth returns the form width to use for menu/select/
